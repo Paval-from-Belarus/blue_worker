@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 
+mod worker;
+mod shared_data;
+
 use esp_backtrace as _;
 use esp_hal::prelude::*;
 use log::info;
@@ -10,7 +13,7 @@ use embassy_time::{Duration, Timer};
 
 extern crate alloc;
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
@@ -25,7 +28,6 @@ async fn main(spawner: Spawner) {
     let timer0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1);
     esp_hal_embassy::init(timer0.timer0);
 
-    info!("Embassy initialized!");
 
     let timer1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
     let _init = esp_wifi::init(
@@ -42,7 +44,5 @@ async fn main(spawner: Spawner) {
         info!("Hello world!");
         Timer::after(Duration::from_secs(1)).await;
     }
-
-    // for inspiration have a look at the examples at https://github.com/esp-rs/esp-hal/tree/v0.22.0/examples/src/bin
 
 }
