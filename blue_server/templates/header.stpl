@@ -1,0 +1,35 @@
+<header>
+    <nav class="navbar">
+        <div class="navbar__title" onclick="changePage('qper')">
+            <div class="navbar__title-logo">
+                <img src="images/nav-links/rinq.png" alt="RinQ Logo"/>
+            </div>
+            <div class="navbar__title-text">
+                <p> <%= name %></p>
+            </div>
+        </div>
+
+        <div class="navbar__links-wrapper">
+            <menu class="navbar__links">
+                <button class="navbar__link" onclick="changePage('/')">
+                    <img src="images/nav-links/home.png" class="navbar__link-icon"/>
+                    <div class="navbar__link-text">
+                        Главная 
+                    </div>
+                </button>
+                <button class="navbar__link" onclick="changePage('lidar')">
+                    <img src="images/nav-links/lidar.png" class="navbar__link-icon"/>
+                    <div class="navbar__link-text">
+                       Лидар 
+                    </div>
+                </button>
+                <button class="navbar__link" onclick="changePage('panorama')">
+                    <img src="images/nav-links/panorama.png" class="navbar__link-icon"/>
+                    <div class="navbar__link-text">
+                        Панорама 
+                    </div>
+                </button>
+            </menu>
+        </div>
+    </nav>
+</header>

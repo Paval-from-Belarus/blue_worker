@@ -1,0 +1,29 @@
+<head>
+	<title>Panorama View</title>
+	<link rel="stylesheet" href="css/common.css">
+</head>
+
+<style>
+  img {
+    width: 100%;
+    max-width: 600px;
+    height: auto;
+    border: 1px solid #ccc;
+  }
+</style>
+<body>
+  <script src="scripts/common.js"></script>
+
+  <% include!("../header.stpl"); %>
+
+  <section>
+     <img id="image" src="panorama/frames"/>
+  </section>
+
+  <% include!("../footer.stpl"); %>
+
+  <script>
+    <% include!("poller.js"); %>
+  </script>
+
+</body>
