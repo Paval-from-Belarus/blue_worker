@@ -75,9 +75,14 @@ impl DeviceSharedState {
                         time_end: Utc::now() + Duration::from_millis(300),
                     },
                     DeviceLifetimeStep {
-                        distance: 2.0,
+                        distance: 1.2,
                         time_start: Utc::now() + Duration::from_millis(500),
                         time_end: Utc::now() + Duration::from_millis(800),
+                    },
+                    DeviceLifetimeStep {
+                        distance: 1.0,
+                        time_start: Utc::now() + Duration::from_millis(900),
+                        time_end: Utc::now() + Duration::from_millis(1000),
                     },
                 ],
             }],

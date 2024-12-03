@@ -19,48 +19,112 @@ function renderTimeline(snapshot) {
 
 	const timeStart = snapshot.timeStart;
 	const timeEnd = snapshot.timeEnd;
+	const timeStep = 100; //min step in milliseconds
 
-	const deviceData = snapshot.devices[0];
+	const colors = ['rgba(75, 192, 192, 0.4)', 'rgba(255, 99, 132, 0.4)', 'rgba(255, 206, 86, 0.4)'];
 
-	const labels = deviceData.lifetime.map(step => {
-		const start = new Date(step.timeStart);
-		return `${start.toLocaleTimeString()} - ${step.distance}m`; // Customize the label format
+	const datasets = [];
+
+	snapshot.devices.forEach((deviceData) => {
+		const data = deviceData.lifetime.flatMap(entry => {
+			return [{
+				x: entry.timeStart,
+				y: deviceData.name,
+				x1: entry.timeEnd,
+				info: `MAC: ${deviceData.macAddress}\n Distance: ${entry.distance}`
+			}, {
+				x: entry.timeEnd,
+				y: deviceData.name,
+				info: `MAC: ${deviceData.macAddress}\n Distance: ${entry.distance}`
+			}
+			]
+		});
+
+		datasets.push({
+			label: deviceData.name,
+			data: data,
+			borderColor: colors[0],
+			backgroundColor: colors[1],
+			fill: true,
+		});
 	});
 
-	const data = deviceData.lifetime.map(step => step.distance);
+	const scatterArbitraryLine = {
+		id: 'scatterArbitraryLine',
+		beforeDatasetsDraw(chart) {
+			const { ctx,
+				data: { datasets },
+				scales: { x, y } } = chart;
+
+			ctx.save();
+			ctx.beginPath();
+
+			ctx.lineWidth = 6;
+
+			datasets.forEach(data => {
+				data.data
+					.filter(entry => entry.x1)
+					.forEach(entry => {
+						ctx.strokeStyle = data.backgroundColor;
+
+						const startX = x.getPixelForValue(entry.x);
+						const endX = x.getPixelForValue(entry.x1);
+
+						const startY = y.getPixelForValue(entry.y);
+						const endY = startY;
+
+						ctx.moveTo(startX, startY);
+						ctx.lineTo(endX, endY);
+					});
+			});
+
+
+			//todo: add milestone label (for 15 minutes)
+
+			ctx.stroke();
+			ctx.closePath();
+			ctx.restore();
+		}
+	};
 
 	new Chart(ctx, {
-		type: 'bar', 
+		type: 'scatter',
+
 		data: {
-			labels: labels,
-			datasets: [{
-				label: 'Distance to Device (m)',
-				data: data,
-				borderColor: 'rgba(75, 192, 192, 1)',
-				backgroundColor: 'rgba(75, 192, 192, 0.2)',
-				fill: true,
-			}]
+			datasets: datasets
 		},
+
 		options: {
 			responsive: true,
 			scales: {
 				x: {
 					title: {
 						display: true,
-						text: 'Time',
+						text: 'Time'
 					},
-					ticks: {
-						autoSkip: true,
-						maxTicksLimit: 20,
-					}
 				},
 				y: {
+					type: 'category', // Set y-axis as categorical
 					title: {
 						display: true,
-						text: 'Distance (m)',
+						text: 'Devices'
+					},
+				}
+			},
+			plugins: {
+				tooltip: {
+					callbacks: {
+						label: function(context) {
+							const deviceInfo = context.dataset.data[context.dataIndex].info;
+							return deviceInfo.split('\n');
+						}
 					}
 				}
 			}
-		}
+		},
+
+		plugins: [scatterArbitraryLine]
 	});
 }
+
+
