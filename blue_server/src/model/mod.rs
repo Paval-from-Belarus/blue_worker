@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use tokio::sync::RwLock;
 
@@ -11,37 +11,76 @@ pub type DeviceId = u64;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceData {
-    /// unique id for device
-    /// This id is assigned according to the value of device mac
-    /// and lifetime appereance
-    pub id: DeviceId,
-    /// lifetime of device
-    pub duration: u64,
-    /// distance to the device
-    pub distance: f32,
     pub mac_address: String,
     pub name: String,
+
+    pub lifetime: Vec<DeviceLifetimeStep>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceLifetimeStep {
+    #[serde(with = "chrono::serde::ts_milliseconds")]
+    pub time_start: DateTime<Utc>,
+    #[serde(with = "chrono::serde::ts_milliseconds")]
+    pub time_end: DateTime<Utc>,
+    /// distance to the device
+    pub distance: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeSnapshot {
-    // #[serde(with = "chrono::")]
+    #[serde(with = "chrono::serde::ts_milliseconds")]
     pub time_start: DateTime<Utc>,
+    #[serde(with = "chrono::serde::ts_milliseconds")]
     pub time_end: DateTime<Utc>,
 
-    pub ids: Vec<DeviceId>,
+    pub devices: Vec<DeviceData>,
+}
 
-    pub devices: HashMap<DeviceId, Vec<DeviceData>>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimeLimits {
+    #[serde(with = "chrono::serde::ts_milliseconds")]
+    pub min: DateTime<Utc>,
+    #[serde(with = "chrono::serde::ts_milliseconds")]
+    pub max: DateTime<Utc>,
 }
 
 impl DeviceSharedState {
+    pub async fn take_limits(&self) -> Option<TimeLimits> {
+        Some(TimeLimits {
+            min: Utc::now(),
+            max: Utc::now() + Duration::from_secs(10),
+        })
+    }
+
     pub async fn take_snapshot(
         &self,
-        time_start: DateTime<Utc>,
-        time_end: DateTime<Utc>,
+        _time_start: DateTime<Utc>,
+        _time_end: DateTime<Utc>,
     ) -> Option<TimeSnapshot> {
-        None
+        Some(TimeSnapshot {
+            time_start: Utc::now(),
+            time_end: Utc::now() + Duration::from_millis(1000),
+            devices: vec![DeviceData {
+                name: "Paval".to_string(),
+                mac_address: "1:1:1:1:1".to_string(),
+
+                lifetime: vec![
+                    DeviceLifetimeStep {
+                        distance: 1.0,
+                        time_start: Utc::now(),
+                        time_end: Utc::now() + Duration::from_millis(300),
+                    },
+                    DeviceLifetimeStep {
+                        distance: 2.0,
+                        time_start: Utc::now() + Duration::from_millis(500),
+                        time_end: Utc::now() + Duration::from_millis(800),
+                    },
+                ],
+            }],
+        })
     }
 }
 
