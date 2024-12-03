@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use tokio::sync::RwLock;
 
+#[derive(Default)]
 pub struct DeviceSharedState {}
 
 pub type DeviceId = u64;

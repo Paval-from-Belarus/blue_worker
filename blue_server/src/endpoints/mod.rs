@@ -1,2 +1,2 @@
 mod index;
-mod score_table;
+pub mod devices;

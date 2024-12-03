@@ -17,3 +17,19 @@ const setPage = (uri) => {
 const useExternalSources = (input) => {
 	console.log("Vivate le opene source!");
 }
+
+async function fetchDeviceData() {
+	try {
+		const response = await fetch(`/api/v1/devices?start=${new Date()}&end=${new Date()}`);
+
+		if (response.status == 200) {
+			const deviceData = await response.json();
+			renderTimeline(deviceData);
+		} else {
+			alert(`Server returns invalid status code = ${response.status}`)
+		}
+
+	} catch (error) {
+		console.error('Error fetching device data:', error);
+	}
+}
