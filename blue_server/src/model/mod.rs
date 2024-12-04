@@ -49,6 +49,11 @@ pub struct TimeLimits {
 }
 
 impl DeviceSharedState {
+    ///
+    pub async fn put_devices(&mut self) {
+
+    }
+
     pub async fn take_limits(&self) -> Option<TimeLimits> {
         Some(TimeLimits {
             min: Utc::now(),

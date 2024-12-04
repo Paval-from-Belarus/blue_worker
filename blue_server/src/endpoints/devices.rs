@@ -3,7 +3,7 @@ use actix_web::{
     error::InternalError,
     get,
     http::{StatusCode, header::HeaderValue},
-    web,
+    put, web,
 };
 use chrono::{DateTime, Utc};
 use sailfish::TemplateSimple;
@@ -32,13 +32,10 @@ pub async fn index() -> actix_web::Result<HttpResponse> {
         .body(body))
 }
 
-#[get("/api/v1/time")]
-pub async fn time_limits(req: HttpRequest) -> actix_web::Result<HttpResponse> {
-    let Some(limits) = devices_lock!(req).take_limits().await else {
-        return Ok(HttpResponse::new(StatusCode::CONFLICT));
-    };
-
-    Ok(HttpResponse::Ok().json(limits))
+#[put("/api/v1/devices")]
+pub async fn add_devices(req: HttpRequest) -> actix_web::Result<HttpResponse> {
+    devices_lock!(req).take_limits()
+    Ok(HttpResponse::Ok())
 }
 
 #[get("/api/v1/devices")]
