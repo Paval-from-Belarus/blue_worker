@@ -1,5 +1,3 @@
-use alloc::string::String;
-
 /// The data to search
 pub struct SearchSample {}
 

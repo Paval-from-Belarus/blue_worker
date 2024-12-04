@@ -1,72 +1,35 @@
 [package]
 name = "blue_worker"
 version = "0.1.0"
+authors = ["Paval-from-Belarus <star-war-sandakan@mail.ru>"]
 edition = "2021"
+resolver = "2"
+rust-version = "1.77"
 
-[dependencies]
-esp-backtrace = { version = "0.14.2", features = [
-    "esp32",
-    "exception-handler",
-    "panic-handler",
-    "println",
-]}
-
-esp-hal = { version = "0.22.0", features = [
-    "esp32",
-] }
-esp-println = { version = "0.12.0", features = ["esp32", "log"] }
-log = { version = "0.4.21" }
-esp-alloc = { version = "0.5.0" }
-embedded-io = "0.6.1"
-
-embedded-io-async = "0.6.1"
-embassy-net = { version = "0.4.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
-
-esp-wifi = { version = "0.11.0", default-features=false, features = [
-    "esp32",
-    "utils",
-    "wifi",
-    "ble",
-    "coex",
-    "esp-alloc",
-    "log",
-] }
-heapless = { version = "0.8.0", default-features = false }
-smoltcp = { version = "0.11.0", default-features = false, features = [
-    "medium-ethernet",
-    "proto-dhcpv4",
-    "proto-igmp",
-    "proto-ipv4",
-    "socket-dhcpv4",
-    "socket-icmp",
-    "socket-raw",
-    "socket-tcp",
-    "socket-udp",
-] }
- bleps = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5148d8ae679e021b78f53fd33afb8bb35d0b62e", features = [ "macros", "async"] }
-embassy-executor = { version = "0.6.0",  features = [
-    "task-arena-size-12288",
-] }
-embassy-time     = { version = "0.3.1",  features = ["generic-queue-8"] }
-esp-hal-embassy  = { version = "0.5.0",  features = ["esp32"] }
-static_cell      = { version = "2.1.0",  features = ["nightly"] }
-critical-section = "1.2.0"
-serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
-
-# esp32-nimble = { version = "0.8.2", default-features = false, features = ["no_std"]}
-# esp-idf-sys = { version = "0.35.0", default-features = false, features = ["binstart"]}
-esp-idf-hal = { version = "0.44.1", default-features = false, features = ["alloc", "binstart"]}
-
-[profile.dev]
-# Rust debug is too slow.
-# For debug builds always builds with some optimization
-opt-level = "s"
+[[bin]]
+name = "blue_worker"
+harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [profile.release]
-codegen-units = 1        # LLVM can perform better optimizations using a single thread
-debug = 2
-debug-assertions = false
-incremental = false
-lto = 'fat'
-opt-level = 's'
-overflow-checks = false
+opt-level = "s"
+
+[profile.dev]
+debug = true    # Symbols are nice and they don't increase the size on Flash
+opt-level = "z"
+
+[features]
+default = []
+
+experimental = ["esp-idf-svc/experimental"]
+
+[dependencies]
+log = "0.4"
+esp-idf-svc = { version = "0.49", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
+serde = "1.0.215"
+esp-idf-hal = "0.44.1"
+esp32-nimble = "0.8.2"
+embedded-svc = "0.28.0"
+
+[build-dependencies]
+embuild = "0.32.0"
+cc = "=1.1.30" # Version "1.1.30" necessary until a new version of `esp-idf-sys` is released
