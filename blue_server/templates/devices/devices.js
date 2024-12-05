@@ -1,31 +1,83 @@
+GLOBAL_CHART = null;
+
 async function fetchDeviceData() {
 	try {
-		const response = await fetch(`/api/v1/devices?start=${new Date()}&end=${new Date()}`);
+		const response = await fetch('/api/v1/devices');
 
-		if (response.status == 200) {
-			const deviceData = await response.json();
-			renderTimeline(deviceData);
-		} else {
+		if (response.status != 200) {
 			alert(`Server returns invalid status code = ${response.status}`)
+			return;
 		}
 
+		const snapshot = await response.json();
+		const deviceListContainer = document.getElementById('device-list');
+		const shouldFilter = document.getElementById('filter-valid-names').checked;
+
+		snapshot.devices.forEach(device => {
+			const label = document.createElement('label');
+			const checkbox = document.createElement('input');
+			checkbox.type = 'checkbox';
+			checkbox.value = device.macAddress;
+			checkbox.id = device.macAddress;
+
+			checkbox.addEventListener('change', updateChart);
+			const macDiv = document.createElement('span');
+			macDiv.appendChild(document.createTextNode(device.macAddress));
+
+			label.appendChild(checkbox);
+			label.appendChild(macDiv);
+
+			if (device.name.length >= 1) {
+				const nameDiv = document.createElement('span');
+				nameDiv.appendChild(document.createTextNode(` ${device.name}`));
+				label.appendChild(nameDiv);
+			}
+			if (!shouldFilter) {
+				deviceListContainer.appendChild(label);
+			} else {
+				if (device.name.length >= 1) {
+					deviceListContainer.appendChild(label);
+				}
+			}
+
+		});
+
+		updateChart(snapshot);
 	} catch (error) {
-		alert('Error fetching device data:', error);
+		alert('Error fetching device list', error);
 	}
 }
 
-function renderTimeline(snapshot) {
-	const ctx = document.getElementById('timelineChart').getContext('2d');
+async function updateChart(snapshot) {
+	const selectedMacs = Array
+		.from(document.querySelectorAll('#device-list input[type="checkbox"]:checked'))
+		.map(checkbox => checkbox.value);
 
-	const timeStart = snapshot.timeStart;
-	const timeEnd = snapshot.timeEnd;
-	const timeStep = 100; //min step in milliseconds
+	if (!snapshot) {
+		response = await fetch('/api/v1/devices');
+
+		if (response.status != 200) {
+			alert(`Server returns invalid status code = ${response.status}`)
+			return;
+		}
+
+		snapshot = await response.json();
+	}
+
+	const devices = snapshot.devices
+		.filter(device => selectedMacs.includes(device.macAddress));
+
+	renderTimeline(devices)
+}
+
+function renderTimeline(devices) {
+	const ctx = document.getElementById('timelineChart').getContext('2d');
 
 	const colors = ['rgba(75, 192, 192, 0.4)', 'rgba(255, 99, 132, 0.4)', 'rgba(255, 206, 86, 0.4)'];
 
 	const datasets = [];
 
-	snapshot.devices.forEach((deviceData, index) => {
+	devices.forEach((deviceData, index) => {
 		const data = deviceData.lifetime.flatMap(entry => {
 			let deviceName = deviceData.name;
 			if (deviceName && deviceName.length < 1) {
@@ -53,6 +105,13 @@ function renderTimeline(snapshot) {
 			fill: true,
 		});
 	});
+
+	if (GLOBAL_CHART) {
+		const chart = GLOBAL_CHART;
+		chart.data = { datasets: datasets };
+		chart.update();
+		return;
+	}
 
 	const scatterArbitraryLine = {
 		id: 'scatterArbitraryLine',
@@ -92,7 +151,7 @@ function renderTimeline(snapshot) {
 		}
 	};
 
-	new Chart(ctx, {
+	GLOBAL_CHART = new Chart(ctx, {
 		type: 'scatter',
 
 		data: {

@@ -10,24 +10,31 @@ use futures::StreamExt;
 use sailfish::TemplateSimple;
 use serde::Deserialize;
 
-use crate::{devices_lock, devices_mut_lock};
+use crate::{devices_lock, devices_mut_lock, model::TimeSnapshot};
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(unused)]
 pub struct DeviceQuery {
-    pub start: Option<DateTime<Utc>>,
-    pub end: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub mac_only: bool,
 }
 
 #[derive(TemplateSimple)]
 #[template(path = "devices/index.stpl")]
-pub struct ScoreTablePage {}
+pub struct ScoreTablePage {
+    snapshot: Option<TimeSnapshot>,
+}
 
 #[get("/devices")]
-pub async fn index() -> actix_web::Result<HttpResponse> {
-    let body = ScoreTablePage {}
-        .render_once()
-        .map_err(|cause| InternalError::new(cause, StatusCode::INTERNAL_SERVER_ERROR))?;
+pub async fn index(req: HttpRequest) -> actix_web::Result<HttpResponse> {
+    let maybe_snapshot = devices_lock!(req)
+        .take_snapshot(Utc::now(), Utc::now())
+        .await;
+
+    let body = ScoreTablePage {
+        snapshot: maybe_snapshot,
+    }
+    .render_once()
+    .map_err(|cause| InternalError::new(cause, StatusCode::INTERNAL_SERVER_ERROR))?;
 
     Ok(HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
@@ -80,16 +87,20 @@ pub async fn add_devices(
 #[get("/api/v1/devices")]
 pub async fn devices_list(
     req: HttpRequest,
-    // query: web::Query<DeviceQuery>,
+    query: web::Query<DeviceQuery>,
 ) -> actix_web::Result<HttpResponse> {
-    // log::info!("Start time = {:?}. End time = {:?}", query.start, query.end);
-
-    let Some(snapshot) = devices_lock!(req)
+    let Some(mut snapshot) = devices_lock!(req)
         .take_snapshot(Utc::now(), Utc::now())
         .await
     else {
         return Err(ErrorNotFound("Snapshot is not available"));
     };
+
+    if query.mac_only {
+        for device in snapshot.devices.iter_mut() {
+            device.lifetime = vec![];
+        }
+    }
 
     let body = serde_json::to_string(&snapshot).expect("Server json is always valid");
 

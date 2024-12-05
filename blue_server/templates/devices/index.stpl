@@ -7,27 +7,58 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        #device-list {
-            display: flex;
-            flex-wrap: wrap;
+     #device-list-container {
+            overflow-y: auto;
+            max-height: 200px; /* Adjust as needed */
+            border: 1px solid #ccc;
+            padding: 5px;
         }
         #device-list label {
-            margin-right: 10px;
-            margin-bottom: 5px;
+            display: block; /* Each checkbox on its own line */
+            margin-bottom: 3px;
+        }
+        #select-all-button {
+            margin-top: 10px;
         }
     </style>
 
 </head>
 <body>
     <h1>Device Activity Timeline</h1>
-    <div id="device-list"></div>
+
+    <button id="select-all-button">Select All</button>
+    <button id="unselect-all-button">Reset</button>
+    <button id="update-chart-button">Update</button>
+    <label>
+        <input type="checkbox" id="filter-valid-names" value="false">
+    </label>
+
+    <div id="device-list-container">
+        <div id="device-list"></div>
+    </div>
+
     <canvas id="timelineChart" width="400" height="200"></canvas>
 
     <script>
         <% include!("devices.js"); %>
 
-        fetchDeviceData();
+        function selectAllDevices() {
+            const checkboxes = document.querySelectorAll('#device-list input[type="checkbox"]');
+            checkboxes.forEach(checkbox => checkbox.checked = true);
+        }
 
+        function unselectAllDevices() {
+            const checkboxes = document.querySelectorAll('#device-list input[type="checkbox"]');
+            checkboxes.forEach(checkbox => checkbox.checked = false);
+        }
+
+        
+        document.getElementById('select-all-button').addEventListener('click', selectAllDevices);
+        document.getElementById('unselect-all-button').addEventListener('click', unselectAllDevices);
+        document.getElementById('update-chart-button').addEventListener('click', () => updateChart(null));
+        document.getElementById('filter-valid-names').addEventListener('click', () => fetchDeviceData());
+        
+        fetchDeviceData();
     </script>
 </body>
 </html>
