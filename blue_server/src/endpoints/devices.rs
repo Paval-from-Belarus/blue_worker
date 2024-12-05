@@ -1,8 +1,8 @@
 use actix_web::{
     HttpRequest, HttpResponse,
-    error::{ErrorBadRequest, InternalError},
+    error::{ErrorBadRequest, ErrorInternalServerError, ErrorNotFound, InternalError},
     get,
-    http::{StatusCode, header::HeaderValue},
+    http::StatusCode,
     put, web,
 };
 use chrono::{DateTime, Utc};
@@ -13,6 +13,7 @@ use serde::Deserialize;
 use crate::{devices_lock, devices_mut_lock};
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(unused)]
 pub struct DeviceQuery {
     pub start: Option<DateTime<Utc>>,
     pub end: Option<DateTime<Utc>>,
@@ -34,6 +35,21 @@ pub async fn index() -> actix_web::Result<HttpResponse> {
 }
 
 const MAX_SIZE: usize = 262_144;
+
+#[get("/api/v1/time")]
+pub async fn time_limis(req: HttpRequest) -> actix_web::Result<HttpResponse> {
+    let Some(limits) = devices_lock!(req).take_limits().await else {
+        return Err(ErrorNotFound("Time limits are not available due no scan"));
+    };
+
+    let Ok(body) = serde_json::to_string(&limits) else {
+        return Err(ErrorInternalServerError(
+            "Time limits are not available in json format",
+        ));
+    };
+
+    Ok(HttpResponse::Ok().json(body))
+}
 
 #[put("/api/v1/devices")]
 pub async fn add_devices(

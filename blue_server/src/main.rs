@@ -20,6 +20,7 @@ async fn main() -> std::io::Result<()> {
             .service(endpoints::devices::index)
             .service(endpoints::devices::devices_list)
             .service(endpoints::devices::add_devices)
+            .service(endpoints::devices::time_limis)
             .service(Files::new("/images", "./templates/images"))
             .service(Files::new("/scripts", "./templates/scripts"))
             .service(Files::new("/css", "./templates/css"))
