@@ -50,9 +50,7 @@ pub struct TimeLimits {
 }
 
 #[derive(Debug, Error)]
-pub enum StateError {
-
-}
+pub enum StateError {}
 impl DeviceSharedState {
     pub async fn put_devices(&mut self, scan: blue_types::Scan) -> Result<(), StateError> {
         log::info!("Incoming devices: {:?}", scan);
@@ -121,4 +119,16 @@ macro_rules! devices_mut_lock {
             .write()
             .await
     };
+}
+
+fn rssi_to_distance(rssi: f32) -> f32 {
+    const A: f32 = -50.0; // RSSI value at 1 meter; adjust based on testing.
+    const N: f32 = 2.0; // Path loss exponent; adjust depending on the environment.
+
+    // Calculate distance in meters
+    if rssi >= A {
+        return 1.0; // If RSSI is stronger than A, assume distance is less than 1 meter
+    }
+
+    10.0f32.powf((A - rssi) / (10.0 * N))
 }
