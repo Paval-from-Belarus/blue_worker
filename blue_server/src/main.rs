@@ -12,11 +12,17 @@ mod model;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    env_logger::builder().init();
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .init();
+
+    let shared_state = DeviceSharedState::load_from_config("shared_state.json").await;
+
+    let shared_lock = Arc::new(RwLock::new(shared_state));
 
     HttpServer::new(move || {
         App::new()
-            .app_data(Arc::new(RwLock::new(DeviceSharedState::default())))
+            .app_data(Arc::clone(&shared_lock))
             .service(endpoints::devices::index)
             .service(endpoints::devices::devices_list)
             .service(endpoints::devices::add_devices)

@@ -23,6 +23,16 @@ impl MacAddress {
     }
 }
 
+impl ToString for MacAddress {
+    fn to_string(&self) -> String {
+        self.0
+            .iter()
+            .map(|byte| format!("{:02x}", byte))
+            .collect::<Vec<String>>()
+            .join(":")
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Scan {
     ///duration in millis for scan

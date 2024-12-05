@@ -88,7 +88,7 @@ pub async fn devices_list(
         .take_snapshot(Utc::now(), Utc::now())
         .await
     else {
-        return Ok(HttpResponse::new(StatusCode::NOT_FOUND));
+        return Err(ErrorNotFound("Snapshot is not available"));
     };
 
     let body = serde_json::to_string(&snapshot).expect("Server json is always valid");

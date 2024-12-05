@@ -8,22 +8,48 @@ use chrono::{DateTime, Utc};
 
 use super::{DeviceData, DeviceLifetimeStep, StateError, TimeLimits, TimeSnapshot};
 
-#[derive(Default)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct DeviceSharedState {
-    pub devices_map: HashMap<String, DeviceData>,
-    pub world_limits: Option<TimeLimits>,
+    devices_map: HashMap<String, DeviceData>,
+    world_limits: Option<TimeLimits>,
+
+    #[serde(skip)]
+    config_path: String,
 }
 
 impl DeviceSharedState {
+    fn with_config_name(name: &'static str) -> Self {
+        Self {
+            devices_map: HashMap::new(),
+            world_limits: None,
+            config_path: name.to_string(),
+        }
+    }
+
+    pub async fn load_from_config(path: &'static str) -> Self {
+        let Ok(raw_data) = tokio::fs::read_to_string(path).await else {
+            return Self::with_config_name(path);
+        };
+
+        match serde_json::from_str(&raw_data) {
+            Ok(state) => state,
+            Err(cause) => {
+                log::warn!("Failed to load shared data: {cause}");
+                Self::with_config_name(path)
+            }
+        }
+    }
+
     pub async fn put_devices(&mut self, scan: Scan) -> Result<(), StateError> {
+        log::debug!("Incoming scan: {:?}", scan);
+
         let Scan { duration, devices } = scan;
 
         let scan_start_time = SystemTime::now() - Duration::from_millis(duration);
         let scan_end_time = SystemTime::now();
 
         for device in devices.into_iter() {
-            let mac_address = String::from_utf8(device.address.as_bytes().to_vec())
-                .expect("Mac address is valid string");
+            let mac_address = device.address.to_string();
 
             self.devices_map
                 .entry(mac_address.clone())
@@ -85,6 +111,12 @@ impl DeviceSharedState {
             });
         }
 
+        let Ok(raw_data) = serde_json::to_vec(self) else {
+            return Ok(());
+        };
+
+        let _ = tokio::fs::write(&self.config_path, raw_data).await;
+
         Ok(())
     }
 
@@ -94,10 +126,20 @@ impl DeviceSharedState {
 
     pub async fn take_snapshot(
         &self,
-        _time_start: DateTime<Utc>,
-        _time_end: DateTime<Utc>,
+        time_start: DateTime<Utc>,
+        time_end: DateTime<Utc>,
     ) -> Option<TimeSnapshot> {
-        None
+        let devices = self
+            .devices_map
+            .values()
+            .cloned()
+            .collect::<Vec<DeviceData>>();
+
+        Some(TimeSnapshot {
+            time_start,
+            time_end,
+            devices,
+        })
     }
 }
 

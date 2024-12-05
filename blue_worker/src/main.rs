@@ -134,8 +134,6 @@ fn scan_devices(ble_scan: &mut BLEScan, ble_device: &BLEDevice) -> Scan {
                     rssi,
                 };
 
-                log::info!("Device data: {:?}", device_data);
-
                 devices.push(device_data);
 
                 None::<()>

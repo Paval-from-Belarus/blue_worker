@@ -10,7 +10,7 @@ async function fetchDeviceData() {
 		}
 
 	} catch (error) {
-		console.error('Error fetching device data:', error);
+		alert('Error fetching device data:', error);
 	}
 }
 
@@ -25,17 +25,22 @@ function renderTimeline(snapshot) {
 
 	const datasets = [];
 
-	snapshot.devices.forEach((deviceData) => {
+	snapshot.devices.forEach((deviceData, index) => {
 		const data = deviceData.lifetime.flatMap(entry => {
+			let deviceName = deviceData.name;
+			if (deviceName && deviceName.length < 1) {
+				deviceName = "<UNKNOWN>";
+			}
+
 			return [{
 				x: entry.timeStart,
-				y: deviceData.name,
+				y: deviceData.macAddress,
 				x1: entry.timeEnd,
-				info: `MAC: ${deviceData.macAddress}\n Distance: ${entry.distance}`
+				info: `Name ${deviceName}\n Distance: ${entry.distance}`
 			}, {
 				x: entry.timeEnd,
-				y: deviceData.name,
-				info: `MAC: ${deviceData.macAddress}\n Distance: ${entry.distance}`
+				y: deviceData.macAddress,
+				info: `Name: ${deviceName}\n Distance: ${entry.distance}`
 			}
 			]
 		});
@@ -43,8 +48,8 @@ function renderTimeline(snapshot) {
 		datasets.push({
 			label: deviceData.name,
 			data: data,
-			borderColor: colors[0],
-			backgroundColor: colors[1],
+			borderColor: colors[index % colors.length],
+			backgroundColor: colors[index % colors.length],
 			fill: true,
 		});
 	});
@@ -104,7 +109,7 @@ function renderTimeline(snapshot) {
 					},
 				},
 				y: {
-					type: 'category', // Set y-axis as categorical
+					type: 'category',
 					title: {
 						display: true,
 						text: 'Devices'
@@ -112,6 +117,9 @@ function renderTimeline(snapshot) {
 				}
 			},
 			plugins: {
+				legend: {
+					display: false,
+				},
 				tooltip: {
 					callbacks: {
 						label: function(context) {
