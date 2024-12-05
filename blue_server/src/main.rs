@@ -18,6 +18,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(Arc::new(RwLock::new(DeviceSharedState::default())))
             .service(endpoints::devices::index)
             .service(endpoints::devices::devices_list)
+            .service(endpoints::devices::add_devices)
             .service(Files::new("/images", "./templates/images"))
             .service(Files::new("/scripts", "./templates/scripts"))
             .service(Files::new("/css", "./templates/css"))

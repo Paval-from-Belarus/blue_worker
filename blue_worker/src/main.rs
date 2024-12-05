@@ -63,15 +63,7 @@ fn main() -> anyhow::Result<()> {
 
     log::info!("Wi-Fi is connected");
 
-    let http_connection = EspHttpConnection::new(&HttpConfig {
-        use_global_ca_store: true,
-        crt_bundle_attach: Some(esp_crt_bundle_attach),
-        ..Default::default()
-    })?;
-
-    let mut http_client = Client::wrap(http_connection);
-
-    let devices_url = format!("{}/api/v1/devices", NETWORK_CONFIG.base_url);
+    let devices_url = NETWORK_CONFIG.base_url;
 
     let ble_device = BLEDevice::take();
 
@@ -80,18 +72,31 @@ fn main() -> anyhow::Result<()> {
     loop {
         let scan = scan_devices(&mut ble_scan, ble_device);
 
-        let request_body = scan.to_vec();
+        let http_connection = EspHttpConnection::new(&HttpConfig {
+            use_global_ca_store: true,
+            crt_bundle_attach: Some(esp_crt_bundle_attach),
+            ..Default::default()
+        })?;
 
-        let Ok(mut request) = http_client.put(
-            &devices_url,
-            &[("Content-Type", "application/octet-stream")],
-        ) else {
+        let mut http_client = Client::wrap(http_connection);
+
+        let body = scan.to_vec();
+
+        let headers = [
+            ("Content-Type", "application/octet-stream"),
+            ("Content-Length", &format!("{}", body.len())),
+            ("Connection", "Keep-Alive"),
+        ];
+
+        let Ok(mut request) = http_client.put(&devices_url, &headers) else {
             log::warn!("Failed to initiate request");
             std::thread::sleep(Duration::from_millis(100));
             continue;
         };
 
-        let _ = request.write_all(&request_body);
+        let _ = request.write_all(&body);
+
+        let _ = request.flush();
 
         let _ = request.submit().inspect(|response| {
             log::info!("Server sends status {}", response.status());
