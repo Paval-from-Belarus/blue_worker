@@ -1,7 +1,8 @@
 [package]
 name = "blue_types"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
+bitcode = { version = "0.6.3", features = ["serde"] }
 serde = { version = "1.0.215", features = ["derive"]}

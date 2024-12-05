@@ -1,14 +1,9 @@
-mod shared_data;
-mod worker;
-
 use std::time::Duration;
 
-use embedded_svc::{
-    http::{self, client::Client},
-    wifi,
-};
+use blue_types::{DeviceData, Scan};
+use embedded_svc::{http::client::Client, wifi};
 use esp32_nimble::{BLEDevice, BLEScan};
-use esp_idf_hal::{prelude::Peripherals, sys::esp_crt_bundle_attach, task};
+use esp_idf_hal::{io::Write, prelude::Peripherals, sys::esp_crt_bundle_attach, task};
 use esp_idf_svc::{
     eventloop::EspSystemEventLoop,
     nvs::EspDefaultNvsPartition,
@@ -16,8 +11,8 @@ use esp_idf_svc::{
 };
 
 use esp_idf_svc::http::client::{Configuration as HttpConfig, EspHttpConnection};
-use shared_data::DeviceData;
 
+#[derive(Debug)]
 #[toml_cfg::toml_config]
 pub struct NetworkConfig {
     #[default("private_wireless_network")]
@@ -25,13 +20,15 @@ pub struct NetworkConfig {
     #[default("")]
     pub password: &'static str,
 
-    #[default("http://192.168.50.1:8080")]
+    #[default("http://localhost:8080")]
     pub base_url: &'static str,
 }
 
 fn main() -> anyhow::Result<()> {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
+
+    log::info!("Wi-Fi config: {:?}", NETWORK_CONFIG);
 
     let peripherals = Peripherals::take()?;
     let sys_loop = EspSystemEventLoop::take()?;
@@ -50,11 +47,12 @@ fn main() -> anyhow::Result<()> {
             .expect("Invalid password"),
         auth_method: esp_idf_svc::wifi::AuthMethod::WPA2Personal,
         ..Default::default()
-    }))?;
+    }))
+    .expect("Failed configure wi-fi");
 
-    wifi.start()?;
+    wifi.start().expect("Failed start wi-fi");
 
-    wifi.connect()?;
+    wifi.connect().expect("Failed connect to wi-fi");
 
     wifi.wait_netif_up()?;
 
@@ -79,33 +77,70 @@ fn main() -> anyhow::Result<()> {
 
     let mut ble_scan = BLEScan::new();
 
-    let devices = task::block_on(async {
+    loop {
+        let scan = scan_devices(&mut ble_scan, ble_device);
+
+        let request_body = scan.to_vec();
+
+        let Ok(mut request) = http_client.put(
+            &devices_url,
+            &[("Content-Type", "application/octet-stream")],
+        ) else {
+            log::warn!("Failed to initiate request");
+            std::thread::sleep(Duration::from_millis(100));
+            continue;
+        };
+
+        let _ = request.write_all(&request_body);
+
+        let _ = request.submit().inspect(|response| {
+            log::info!("Server sends status {}", response.status());
+        });
+    }
+}
+
+fn scan_devices(ble_scan: &mut BLEScan, ble_device: &BLEDevice) -> Scan {
+    task::block_on(async {
         ble_scan.active_scan(true).interval(100).window(99);
 
-        let devices = Vec::<DeviceData>::new();
+        let scan_duration = 5_000;
+
+        let mut devices = Vec::<DeviceData>::new();
 
         let _ = ble_scan
-            .start(ble_device, 5000, |device, data| {
-                log::info!("Advertised Device: ({:?}, {:?})", device, data);
+            .start(ble_device, scan_duration as i32, |device, data| {
+                let name = data
+                    .name()
+                    .and_then(|raw_name| {
+                        core::str::from_utf8(raw_name)
+                            .inspect_err(|_cause| {
+                                log::debug!("{raw_name} is not valid utf-8");
+                            })
+                            .ok()
+                    })
+                    .map(|name| name.to_string());
 
-                // devices.push(d); //todo: save device data
+                let address = device.addr().as_le_bytes().into();
+                let rssi = device.rssi();
+
+                let device_data = DeviceData {
+                    name,
+                    address,
+                    rssi,
+                };
+
+                log::info!("Device data: {:?}", device_data);
+
+                devices.push(device_data);
+
                 None::<()>
             })
             .await
             .expect("Failed to scan devices");
 
-        devices
-    });
-
-    let request = http_client
-        .request(http::Method::Get, &time_url, &[("accept", "text/plain")])
-        .unwrap();
-
-    let _response = request.submit().unwrap();
-    //todo: extract timestamp here
-
-    loop {
-        std::thread::sleep(Duration::from_millis(200));
-        log::info!("Hello world");
-    }
+        Scan {
+            duration: scan_duration,
+            devices,
+        }
+    })
 }

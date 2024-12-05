@@ -31,6 +31,7 @@ esp32-nimble = "0.8.2"
 embedded-svc = "0.28.0"
 toml-cfg = "0.2.0"
 blue_types = { path = "../blue_types" }
+anyhow = "1.0.94"
 
 [build-dependencies]
 embuild = "0.32.0"
