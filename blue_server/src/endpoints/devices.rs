@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use sailfish::TemplateSimple;
 use serde::Deserialize;
 
-use crate::devices_lock;
+use crate::{devices_lock, devices_mut_lock};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DeviceQuery {
@@ -33,9 +33,18 @@ pub async fn index() -> actix_web::Result<HttpResponse> {
 }
 
 #[put("/api/v1/devices")]
-pub async fn add_devices(req: HttpRequest) -> actix_web::Result<HttpResponse> {
-    devices_lock!(req).take_limits()
-    Ok(HttpResponse::Ok())
+pub async fn add_devices(
+    req: HttpRequest,
+    raw_data: web::Bytes,
+) -> actix_web::Result<HttpResponse> {
+    let Some(scan) = blue_types::Scan::from_bytes(&raw_data) else {
+        return Ok(HttpResponse::new(StatusCode::BAD_REQUEST));
+    };
+
+    match devices_mut_lock!(req).put_devices(scan).await {
+        Ok(_) => Ok(HttpResponse::Ok().into()),
+        Err(_) => Ok(HttpResponse::new(StatusCode::BAD_REQUEST)),
+    }
 }
 
 #[get("/api/v1/devices")]

@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
+use thiserror::Error;
 
 use tokio::sync::RwLock;
 
@@ -48,10 +49,15 @@ pub struct TimeLimits {
     pub max: DateTime<Utc>,
 }
 
-impl DeviceSharedState {
-    ///
-    pub async fn put_devices(&mut self) {
+#[derive(Debug, Error)]
+pub enum StateError {
 
+}
+impl DeviceSharedState {
+    pub async fn put_devices(&mut self, scan: blue_types::Scan) -> Result<(), StateError> {
+        log::info!("Incoming devices: {:?}", scan);
+
+        Ok(())
     }
 
     pub async fn take_limits(&self) -> Option<TimeLimits> {

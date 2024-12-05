@@ -1,11 +1,35 @@
-#[derive(serde::Serialize, serde::Deserialize)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MacAddress([u8; 6]);
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceData {
-    pub timestamp: u64,
     ///MAC-address for device
     pub address: MacAddress,
-    pub name: String,
-    pub rssi: u8,
+    pub name: Option<String>,
+    pub rssi: i8,
+}
+
+impl From<[u8; 6]> for MacAddress {
+    fn from(value: [u8; 6]) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Scan {
+    //duration in millis for scan
+    pub duration: u64,
+    pub devices: Vec<DeviceData>,
+}
+
+impl Scan {
+    pub fn to_vec(&self) -> Vec<u8> {
+        bitcode::serialize(self).unwrap()
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Option<Scan> {
+        bitcode::deserialize(bytes).ok()
+    }
 }
