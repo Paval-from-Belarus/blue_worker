@@ -21,21 +21,12 @@ pub struct DeviceLifetimeStep {
     pub distance: f32,
 }
 
-
-fn rssi_to_distance(rssi: f32) -> f32 {
-    const A: f32 = -50.0; // RSSI value at 1 meter; adjust based on testing.
-    const N: f32 = 2.0; // Path loss exponent; adjust depending on the environment.
-
-    // Calculate distance in meters
-    if rssi >= A {
-        return 1.0; // If RSSI is stronger than A, assume distance is less than 1 meter
+impl DeviceLifetimeStep {
+    pub fn time_start_millis(&self) -> u64 {
+        self.time_start.timestamp_millis() as u64
     }
 
-    10.0f32.powf((A - rssi) / (10.0 * N))
-}
-
-impl From<blue_types::DeviceData> for DeviceData {
-    fn from(value: blue_types::DeviceData) -> Self {
-        
+    pub fn time_end_millis(&self) -> u64 {
+        self.time_end.timestamp_millis() as u64
     }
 }

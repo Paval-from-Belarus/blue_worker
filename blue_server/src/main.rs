@@ -1,4 +1,3 @@
-#![feature(is_sorted)]
 #![feature(let_chains)]
 
 use std::sync::Arc;
