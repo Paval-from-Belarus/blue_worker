@@ -17,9 +17,15 @@ impl From<[u8; 6]> for MacAddress {
     }
 }
 
+impl MacAddress {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Scan {
-    //duration in millis for scan
+    ///duration in millis for scan
     pub duration: u64,
     pub devices: Vec<DeviceData>,
 }

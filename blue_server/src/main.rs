@@ -1,3 +1,6 @@
+#![feature(is_sorted)]
+#![feature(let_chains)]
+
 use std::sync::Arc;
 
 use actix_files::Files;
@@ -10,8 +13,7 @@ mod model;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    env_logger::builder()
-        .init();
+    env_logger::builder().init();
 
     HttpServer::new(move || {
         App::new()
