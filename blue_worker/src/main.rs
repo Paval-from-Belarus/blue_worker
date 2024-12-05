@@ -106,7 +106,11 @@ fn main() -> anyhow::Result<()> {
 
 fn scan_devices(ble_scan: &mut BLEScan, ble_device: &BLEDevice) -> Scan {
     task::block_on(async {
-        ble_scan.active_scan(true).interval(100).window(99);
+        ble_scan
+            .active_scan(true)
+            .interval(100)
+            .window(99)
+            .filter_policy(esp32_nimble::enums::ScanFilterPolicy::NoWlInitA);
 
         let scan_duration = 5_000;
 
