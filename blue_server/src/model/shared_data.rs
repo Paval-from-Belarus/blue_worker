@@ -13,7 +13,7 @@ pub struct DeviceSharedState {
     devices_map: HashMap<String, DeviceData>,
     world_limits: Option<TimeLimits>,
 
-    #[serde(skip)]
+    #[serde(skip, default)]
     config_path: String,
 }
 
@@ -31,8 +31,12 @@ impl DeviceSharedState {
             return Self::with_config_name(path);
         };
 
-        match serde_json::from_str(&raw_data) {
-            Ok(state) => state,
+        match serde_json::from_str::<Self>(&raw_data) {
+            Ok(mut state) => {
+                state.config_path = path.to_string();
+
+                state
+            }
             Err(cause) => {
                 log::warn!("Failed to load shared data: {cause}");
                 Self::with_config_name(path)

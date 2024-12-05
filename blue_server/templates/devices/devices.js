@@ -107,6 +107,13 @@ function renderTimeline(snapshot) {
 						display: true,
 						text: 'Time'
 					},
+					ticks: {
+						callback: function(value, index, ticks) {
+							return formatTimestamp(value)
+						},
+						autoSkip: true,
+						maxTicksLimit: 20
+					}
 				},
 				y: {
 					type: 'category',
@@ -120,6 +127,7 @@ function renderTimeline(snapshot) {
 				legend: {
 					display: false,
 				},
+
 				tooltip: {
 					callbacks: {
 						label: function(context) {
@@ -135,4 +143,9 @@ function renderTimeline(snapshot) {
 	});
 }
 
+
+function formatTimestamp(timestamp) {
+	const date = new Date(timestamp);
+	return `${date.getHours()} : ${date.getMinutes()}`
+}
 

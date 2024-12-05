@@ -6,9 +6,21 @@
     <title>Device Timeline</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <style>
+        #device-list {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        #device-list label {
+            margin-right: 10px;
+            margin-bottom: 5px;
+        }
+    </style>
+
 </head>
 <body>
     <h1>Device Activity Timeline</h1>
+    <div id="device-list"></div>
     <canvas id="timelineChart" width="400" height="200"></canvas>
 
     <script>
