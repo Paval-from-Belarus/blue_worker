@@ -1,4 +1,39 @@
 GLOBAL_CHART = null;
+GLOBAL_DEVICESS = null;
+
+// Get the input element
+const searchBar = document.getElementById("search-bar");
+
+// Get the search results element
+const searchResults = document.getElementById("search-results");
+
+// Add an event listener for the input event on the search bar
+searchBar.addEventListener("input", (event) => {
+	// Get the search query from the event
+	const query = event.target.value.toLowerCase();
+
+	// Clear the search results
+	searchResults.innerHTML = "";
+
+	if (!GLOBAL_DEVICES) {
+		alert("No devices");
+	} else {
+		for (const device of GLOBAL_DEVICES) {
+			const macAddress = device.macAddress.toLowerCase();
+			if (query.length > 0 && macAddress.startsWith(query)) {
+				const listItem = document.createElement("li");
+
+				listItem.textContent = macAddress;
+
+				searchResults.appendChild(listItem);
+			}
+		}
+
+	}
+
+	searchResults.classList.add("active");
+});
+
 
 async function fetchDeviceData() {
 	try {
@@ -63,6 +98,8 @@ async function updateChart(snapshot) {
 
 		snapshot = await response.json();
 	}
+
+	GLOBAL_DEVICES = snapshot.devices;
 
 	const devices = snapshot.devices
 		.filter(device => selectedMacs.includes(device.macAddress));

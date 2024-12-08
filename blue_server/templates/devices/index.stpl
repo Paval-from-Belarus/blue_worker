@@ -20,11 +20,28 @@
         #select-all-button {
             margin-top: 10px;
         }
+        .search-bar__items {
+          visibility: hidden;
+        }
+        
+        .search-bar__items li {
+          padding: 10px;
+          margin: 5px;
+          background-color: white;
+          cursor: pointer;
+        }
+        
+        .search-bar__items.active  {
+          visibility: visible;
+        }
+
     </style>
 
 </head>
 <body>
     <h1>Device Activity Timeline</h1>
+    <input type="text" id="search-bar" placeholder="Search...">
+    <ul id="search-results" class="search-bar__items"></ul>
 
     <button id="select-all-button">Select All</button>
     <button id="unselect-all-button">Reset</button>
@@ -57,6 +74,12 @@
         document.getElementById('unselect-all-button').addEventListener('click', unselectAllDevices);
         document.getElementById('update-chart-button').addEventListener('click', () => updateChart(null));
         document.getElementById('filter-valid-names').addEventListener('click', () => fetchDeviceData());
+        document.addEventListener("click", (event) => {
+          // Hide the search results overlay if clicked outside of it
+          if (!event.target.closest("#search-bar") && !event.target.closest("#search-results")) {
+            searchResults.classList.remove("active");
+          }
+        });
         
         fetchDeviceData();
     </script>
