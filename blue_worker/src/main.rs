@@ -3,14 +3,18 @@ use std::time::Duration;
 use blue_types::{DeviceData, Scan};
 use embedded_svc::{http::client::Client, wifi};
 use esp32_nimble::{BLEDevice, BLEScan};
-use esp_idf_hal::{io::Write, prelude::Peripherals, sys::esp_crt_bundle_attach, task};
+use esp_idf_hal::{
+    io::Write, prelude::Peripherals, sys::esp_crt_bundle_attach, task,
+};
 use esp_idf_svc::{
     eventloop::EspSystemEventLoop,
     nvs::EspDefaultNvsPartition,
     wifi::{BlockingWifi, ClientConfiguration, EspWifi},
 };
 
-use esp_idf_svc::http::client::{Configuration as HttpConfig, EspHttpConnection};
+use esp_idf_svc::http::client::{
+    Configuration as HttpConfig, EspHttpConnection,
+};
 
 #[derive(Debug)]
 #[toml_cfg::toml_config]
@@ -50,27 +54,26 @@ fn main() -> anyhow::Result<()> {
     }))
     .expect("Failed configure wi-fi");
 
+    wifi.start().expect("Failed start wi-fi");
+
+    wifi.connect().expect("Failed connect to wi-fi");
+
+    wifi.wait_netif_up()?;
+
+    log::info!("Wi-Fi is connected");
+
+    while !wifi.is_connected().unwrap() {
+        let config = wifi.get_configuration().unwrap();
+        log::info!("Waiting for station: {:?}", config);
+    }
+
     let devices_url = NETWORK_CONFIG.base_url;
 
     let ble_device = BLEDevice::take();
-
     let mut ble_scan = BLEScan::new();
 
     loop {
         let scan = scan_devices(&mut ble_scan, ble_device);
-
-        wifi.start().expect("Failed start wi-fi");
-
-        wifi.connect().expect("Failed connect to wi-fi");
-
-        log::info!("Wi-Fi is connected");
-
-        wifi.wait_netif_up()?;
-
-        while !wifi.is_connected().unwrap() {
-            let config = wifi.get_configuration().unwrap();
-            log::info!("Waiting for station: {:?}", config);
-        }
 
         let http_connection = EspHttpConnection::new(&HttpConfig {
             use_global_ca_store: true,
@@ -98,23 +101,20 @@ fn main() -> anyhow::Result<()> {
 
         let _ = request.flush();
 
-            let _ = request.submit().inspect(|response| {
+        let _ = request.submit().inspect(|response| {
             log::info!("Server sends status {}", response.status());
         });
-
-        wifi.stop().expect("Failed to stop wifi");
     }
 }
 
 fn scan_devices(ble_scan: &mut BLEScan, ble_device: &BLEDevice) -> Scan {
     task::block_on(async {
-        ble_scan
-            .active_scan(true)
-            .interval(200)
-            .window(199)
-            .filter_duplicates(false)
-            .limited(false)
-            .filter_policy(esp32_nimble::enums::ScanFilterPolicy::NoWl);
+        // ble_scan
+        //     .active_scan(true)
+        //     .interval(200)
+        //     .window(30)
+        //     .limited(false);
+        // .filter_policy(esp32_nimble::enums::ScanFilterPolicy::NoWl);
 
         let scan_duration = 5_000;
 
