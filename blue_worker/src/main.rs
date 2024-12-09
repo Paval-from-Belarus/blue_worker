@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use blue_types::{DeviceData, Scan};
 use embedded_svc::{http::client::Client, wifi};
-use esp32_nimble::{BLEDevice, BLEScan};
+use esp32_nimble::{
+    enums::{AuthReq, SecurityIOCap},
+    BLEDevice, BLEScan,
+};
 use esp_idf_hal::{
     io::Write, prelude::Peripherals, sys::esp_crt_bundle_attach, task,
 };
@@ -70,6 +73,14 @@ fn main() -> anyhow::Result<()> {
     let devices_url = NETWORK_CONFIG.base_url;
 
     let ble_device = BLEDevice::take();
+
+    ble_device
+        .security()
+        .set_auth(AuthReq::all())
+        .set_passkey(123456)
+        .set_io_cap(SecurityIOCap::DisplayOnly)
+        .resolve_rpa();
+
     let mut ble_scan = BLEScan::new();
 
     loop {
@@ -93,7 +104,7 @@ fn main() -> anyhow::Result<()> {
 
         let Ok(mut request) = http_client.put(devices_url, &headers) else {
             log::warn!("Failed to initiate request");
-            std::thread::sleep(Duration::from_millis(100));
+            std::thread::sleep(Duration::from_millis(1000));
             continue;
         };
 
@@ -109,14 +120,13 @@ fn main() -> anyhow::Result<()> {
 
 fn scan_devices(ble_scan: &mut BLEScan, ble_device: &BLEDevice) -> Scan {
     task::block_on(async {
-        // ble_scan
-        //     .active_scan(true)
-        //     .interval(200)
-        //     .window(30)
-        //     .limited(false);
-        // .filter_policy(esp32_nimble::enums::ScanFilterPolicy::NoWl);
+        ble_scan
+            .interval(500)
+            .window(400)
+            .active_scan(true)
+            .limited(false);
 
-        let scan_duration = 5_000;
+        let scan_duration = 10_000;
 
         let mut devices = Vec::<DeviceData>::new();
 
@@ -125,6 +135,8 @@ fn scan_devices(ble_scan: &mut BLEScan, ble_device: &BLEDevice) -> Scan {
                 let name = data
                     .name()
                     .and_then(|raw_name| {
+                        log::info!("Device with name {raw_name}");
+
                         core::str::from_utf8(raw_name)
                             .inspect_err(|_cause| {
                                 log::debug!("{raw_name} is not valid utf-8");
