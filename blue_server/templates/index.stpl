@@ -1,0 +1,17 @@
+<html>
+<head>
+	<title>Robot Web Interface</title>
+	<link rel="stylesheet" href="css/common.css">
+</head>
+<body>
+	<script src="scripts/common.js"></script>
+	<% include!("header.stpl"); %>
+		<section class='content__section'>
+			<p>
+			Welcome to <%= name %> Web Interface
+			</p>
+		</section>
+	<% include!("footer.stpl"); %>
+</body>
+</html>
+

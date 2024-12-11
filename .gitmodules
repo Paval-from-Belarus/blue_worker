@@ -1,0 +1,3 @@
+[submodule "shared/esp-idf-svc"]
+	path = shared/esp-idf-svc
+	url = https://github.com/Paval-from-Belarus/esp-idf-svc

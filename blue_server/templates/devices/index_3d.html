@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Point Cloud</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script src="https://cdn.jsdelivr.net/npm/three@latest/build/three.min.js"></script>
+  <script>
+    // Scene, Camera, and Renderer Setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Generate Point Cloud Data
+    const pointCount = 10000; // Number of points
+    const positions = [];
+    for (let i = 0; i < pointCount; i++) {
+      const x = (Math.random() - 0.5) * 100; // Random x position
+      const y = (Math.random() - 0.5) * 100; // Random y position
+      const z = (Math.random() - 0.5) * 100; // Random z position
+      positions.push(x, y, z);
+    }
+
+    // Create Buffer Geometry for Point Cloud
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
+    // Material for the Points
+    const material = new THREE.PointsMaterial({
+      color: 0x00ff00,
+      size: 0.5,
+    });
+
+    // Create the Point Cloud
+    const pointCloud = new THREE.Points(geometry, material);
+    scene.add(pointCloud);
+
+    // Position the Camera
+    camera.position.z = 50;
+
+    // Animation Loop
+    function animate() {
+      requestAnimationFrame(animate);
+      pointCloud.rotation.y += 0.001; // Rotate the point cloud
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2D Point Cloud with Concentric Circles</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script src="https://cdn.jsdelivr.net/npm/three@latest/build/three.min.js"></script>
+  <script>
+    // Scene, Camera, and Renderer Setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(
+      window.innerWidth / -2, window.innerWidth / 2,
+      window.innerHeight / 2, window.innerHeight / -2,
+      1, 1000
+    );
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    camera.position.z = 10; // Position the camera
+
+    // Helper to Create Concentric Circles
+    function createConcentricCircles(centerX, centerY, circleCount, spacing) {
+      const circles = new THREE.Group();
+      const material = new THREE.LineBasicMaterial({ color: 0x0000ff }); // Blue lines
+
+      for (let i = 1; i <= circleCount; i++) {
+        const geometry = new THREE.CircleGeometry(i * spacing, 64);
+        const circle = new THREE.LineLoop(geometry, material);
+        circle.position.set(centerX, centerY, 0);
+        circles.add(circle);
+      }
+
+      return circles;
+    }
+
+    // Add Concentric Circles to the Scene
+    const circles = createConcentricCircles(0, 0, 5, 50); // 5 circles, 50px apart
+    scene.add(circles);
+
+    // Helper to Generate a Random Point Cloud
+    function generatePointCloud(pointCount, range) {
+      const positions = [];
+      for (let i = 0; i < pointCount; i++) {
+        const x = (Math.random() - 0.5) * range * 2; // Random x within range
+        const y = (Math.random() - 0.5) * range * 2; // Random y within range
+        positions.push(x, y, 0); // Z is 0 for 2D
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      const material = new THREE.PointsMaterial({ color: 0xff0000, size: 3 }); // Red points
+      return new THREE.Points(geometry, material);
+    }
+
+    // Add Point Cloud to the Scene
+    const pointCloud = generatePointCloud(1000, 200); // 1000 points within a range of 200px
+    scene.add(pointCloud);
+
+    // Animation Loop
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Adjust on Window Resize
+    window.addEventListener('resize', () => {
+      camera.left = window.innerWidth / -2;
+      camera.right = window.innerWidth / 2;
+      camera.top = window.innerHeight / 2;
+      camera.bottom = window.innerHeight / -2;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
