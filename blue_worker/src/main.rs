@@ -2,14 +2,11 @@ use std::time::Duration;
 
 use blue_types::{DeviceData, Scan};
 use embedded_svc::{http::client::Client, wifi};
-use esp32_nimble::{
-    enums::{AuthReq, SecurityIOCap},
-    BLEDevice, BLEScan,
-};
-use esp_idf_hal::{
-    io::Write, prelude::Peripherals, sys::esp_crt_bundle_attach, task,
+use esp_idf_svc::hal::{
+    io::Write, prelude::Peripherals, sys::esp_crt_bundle_attach,
 };
 use esp_idf_svc::{
+    bt::{BtClassic, BtDriver},
     eventloop::EspSystemEventLoop,
     nvs::EspDefaultNvsPartition,
     wifi::{BlockingWifi, ClientConfiguration, EspWifi},
@@ -41,8 +38,10 @@ fn main() -> anyhow::Result<()> {
     let sys_loop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
 
+    let (wifi_modem, bl_modem) = peripherals.modem.split();
+
     let mut wifi = BlockingWifi::wrap(
-        EspWifi::new(peripherals.modem, sys_loop.clone(), Some(nvs)).unwrap(),
+        EspWifi::new(wifi_modem, sys_loop.clone(), Some(nvs.clone())).unwrap(),
         sys_loop.clone(),
     )?;
 
@@ -72,19 +71,13 @@ fn main() -> anyhow::Result<()> {
 
     let devices_url = NETWORK_CONFIG.base_url;
 
-    let ble_device = BLEDevice::take();
+    let mut bt_driver =
+        BtDriver::<'static, BtClassic>::new(bl_modem, Some(nvs)).unwrap();
 
-    ble_device
-        .security()
-        .set_auth(AuthReq::all())
-        .set_passkey(123456)
-        .set_io_cap(SecurityIOCap::DisplayOnly)
-        .resolve_rpa();
-
-    let mut ble_scan = BLEScan::new();
+    bt_driver.set_device_name("Rust Worker 1").unwrap();
 
     loop {
-        let scan = scan_devices(&mut ble_scan, ble_device);
+        let scan = scan_devices(&mut bt_driver);
 
         let http_connection = EspHttpConnection::new(&HttpConfig {
             use_global_ca_store: true,
@@ -118,52 +111,37 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-fn scan_devices(ble_scan: &mut BLEScan, ble_device: &BLEDevice) -> Scan {
-    task::block_on(async {
-        ble_scan
-            .interval(500)
-            .window(400)
-            .active_scan(true)
-            .limited(false);
+fn scan_devices(bt_driver: &mut BtDriver<BtClassic>) -> Scan {
+    unsafe { DEVICES.clear() };
 
-        let scan_duration = 10_000;
+    let scan_duration = 15_000;
 
-        let mut devices = Vec::<DeviceData>::new();
-
-        let _ = ble_scan
-            .start(ble_device, scan_duration as i32, |device, data| {
-                let name = data
-                    .name()
-                    .and_then(|raw_name| {
-                        log::info!("Device with name {raw_name}");
-
-                        core::str::from_utf8(raw_name)
-                            .inspect_err(|_cause| {
-                                log::debug!("{raw_name} is not valid utf-8");
-                            })
-                            .ok()
-                    })
-                    .map(|name| name.to_string());
-
-                let address = device.addr().as_le_bytes().into();
-                let rssi = device.rssi();
-
-                let device_data = DeviceData {
-                    name,
-                    address,
-                    rssi,
-                };
-
-                devices.push(device_data);
-
-                None::<()>
-            })
-            .await
-            .expect("Failed to scan devices");
-
-        Scan {
-            duration: scan_duration,
-            devices,
+    let _ = bt_driver.start_scan(scan_duration as u32, |data| {
+        let name = data.name;
+        if let Some(ref name) = name {
+            log::info!("Device with name {name}");
         }
-    })
+
+        let address = data.addr.into();
+        let rssi = data.rssi;
+
+        let device_data = DeviceData {
+            name,
+            address,
+            rssi,
+        };
+
+        unsafe {
+            DEVICES.push(device_data);
+        }
+    });
+
+    unsafe {
+        Scan {
+            devices: DEVICES.clone(),
+            duration: scan_duration,
+        }
+    }
 }
+
+static mut DEVICES: Vec<DeviceData> = vec![];
