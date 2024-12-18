@@ -107,6 +107,8 @@ async function updateChart(snapshot) {
 	renderTimeline(devices)
 }
 
+setInterval(2000, updateChart(null));
+
 function renderTimeline(devices) {
 	const ctx = document.getElementById('timelineChart').getContext('2d');
 

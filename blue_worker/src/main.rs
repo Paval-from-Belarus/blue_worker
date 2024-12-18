@@ -1,7 +1,4 @@
-use std::time::Duration;
-
 use blue_types::{DeviceData, Scan};
-use embedded_svc::{http::client::Client, wifi};
 use esp_idf_svc::hal::{
     io::Write, prelude::Peripherals, sys::esp_crt_bundle_attach,
 };
@@ -12,12 +9,9 @@ use esp_idf_svc::{
     wifi::{BlockingWifi, ClientConfiguration, EspWifi},
 };
 
-use esp_idf_svc::http::client::{
-    Configuration as HttpConfig, EspHttpConnection,
-};
-
 #[derive(Debug)]
 #[toml_cfg::toml_config]
+#[cfg(feature = "http")]
 pub struct NetworkConfig {
     #[default("private_wireless_network")]
     pub ssid: &'static str,
@@ -32,44 +26,58 @@ fn main() -> anyhow::Result<()> {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
 
-    log::info!("Wi-Fi config: {:?}", NETWORK_CONFIG);
-
     let peripherals = Peripherals::take()?;
-    let sys_loop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
 
+    #[cfg(not(feature = "wifi"))]
+    let bl_modem = peripherals.modem;
+    #[cfg(feature = "wifi")]
     let (wifi_modem, bl_modem) = peripherals.modem.split();
 
-    let mut wifi = BlockingWifi::wrap(
-        EspWifi::new(wifi_modem, sys_loop.clone(), Some(nvs.clone())).unwrap(),
-        sys_loop.clone(),
-    )?;
+    #[cfg(feature = "wifi")]
+    let mut device = {
+        use embedded_svc::{http::client::Client, wifi};
 
-    wifi.set_configuration(&wifi::Configuration::Client(ClientConfiguration {
-        ssid: NETWORK_CONFIG.ssid.try_into().expect("Invalid ssid"),
-        password: NETWORK_CONFIG
-            .password
-            .try_into()
-            .expect("Invalid password"),
-        auth_method: esp_idf_svc::wifi::AuthMethod::WPA2Personal,
-        ..Default::default()
-    }))
-    .expect("Failed configure wi-fi");
+        let sys_loop = EspSystemEventLoop::take()?;
 
-    wifi.start().expect("Failed start wi-fi");
+        let wifi = BlockingWifi::wrap(
+            EspWifi::new(wifi_modem, sys_loop.clone(), Some(nvs.clone()))
+                .unwrap(),
+            sys_loop.clone(),
+        )?;
 
-    wifi.connect().expect("Failed connect to wi-fi");
+        log::info!("Wi-Fi config: {:?}", NETWORK_CONFIG);
+        wifi.set_configuration(&wifi::Configuration::Client(
+            ClientConfiguration {
+                ssid: NETWORK_CONFIG.ssid.try_into().expect("Invalid ssid"),
+                password: NETWORK_CONFIG
+                    .password
+                    .try_into()
+                    .expect("Invalid password"),
+                auth_method: esp_idf_svc::wifi::AuthMethod::WPA2Personal,
+                ..Default::default()
+            },
+        ))
+        .expect("Failed configure wi-fi");
 
-    wifi.wait_netif_up()?;
+        wifi.start().expect("Failed start wi-fi");
 
-    log::info!("Wi-Fi is connected");
+        wifi.connect().expect("Failed connect to wi-fi");
 
-    while !wifi.is_connected().unwrap() {
-        let config = wifi.get_configuration().unwrap();
-        log::info!("Waiting for station: {:?}", config);
-    }
+        wifi.wait_netif_up()?;
 
-    let devices_url = NETWORK_CONFIG.base_url;
+        log::info!("Wi-Fi is connected");
+
+        while !wifi.is_connected().unwrap() {
+            let config = wifi.get_configuration().unwrap();
+            log::info!("Waiting for station: {:?}", config);
+        }
+
+        wifi
+    };
+
+    #[cfg(feature = "serial")]
+    let device = ();
 
     let mut bt_driver =
         BtDriver::<'static, BtClassic>::new(bl_modem, Some(nvs)).unwrap();
@@ -79,35 +87,7 @@ fn main() -> anyhow::Result<()> {
     loop {
         let scan = scan_devices(&mut bt_driver);
 
-        let http_connection = EspHttpConnection::new(&HttpConfig {
-            use_global_ca_store: true,
-            crt_bundle_attach: Some(esp_crt_bundle_attach),
-            ..Default::default()
-        })?;
-
-        let mut http_client = Client::wrap(http_connection);
-
-        let body = scan.to_vec();
-
-        let headers = [
-            ("Content-Type", "application/octet-stream"),
-            ("Content-Length", &format!("{}", body.len())),
-            ("Connection", "Keep-Alive"),
-        ];
-
-        let Ok(mut request) = http_client.put(devices_url, &headers) else {
-            log::warn!("Failed to initiate request");
-            std::thread::sleep(Duration::from_millis(1000));
-            continue;
-        };
-
-        let _ = request.write_all(&body);
-
-        let _ = request.flush();
-
-        let _ = request.submit().inspect(|response| {
-            log::info!("Server sends status {}", response.status());
-        });
+        send_scan(scan, device)?;
     }
 }
 
@@ -142,6 +122,54 @@ fn scan_devices(bt_driver: &mut BtDriver<BtClassic>) -> Scan {
             duration: scan_duration,
         }
     }
+}
+
+#[cfg(feature = "serial")]
+fn send_scan(_scan: Scan, _device: ()) -> anyhow::Result<()> {
+    Ok(())
+}
+
+#[cfg(feature = "http")]
+fn send_scan(scan: Scan, device: wifi) {
+    use esp_idf_svc::http::client::{
+        Configuration as HttpConfig, EspHttpConnection,
+    };
+
+    use esp_idf_svc::hal::io::Write;
+
+    use std::time::Duration;
+
+    let devices_url = NETWORK_CONFIG.base_url;
+
+    let http_connection = EspHttpConnection::new(&HttpConfig {
+        use_global_ca_store: true,
+        crt_bundle_attach: Some(esp_crt_bundle_attach),
+        ..Default::default()
+    })?;
+
+    let mut http_client = Client::wrap(http_connection);
+
+    let body = scan.to_vec();
+
+    let headers = [
+        ("Content-Type", "application/octet-stream"),
+        ("Content-Length", &format!("{}", body.len())),
+        ("Connection", "Keep-Alive"),
+    ];
+
+    let Ok(mut request) = http_client.put(devices_url, &headers) else {
+        log::warn!("Failed to initiate request");
+        std::thread::sleep(Duration::from_millis(1000));
+        continue;
+    };
+
+    let _ = request.write_all(&body);
+
+    let _ = request.flush();
+
+    let _ = request.submit().inspect(|response| {
+        log::info!("Server sends status {}", response.status());
+    });
 }
 
 static mut DEVICES: Vec<DeviceData> = vec![];

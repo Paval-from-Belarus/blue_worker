@@ -17,8 +17,12 @@ opt-level = "s"
 debug = true    # Symbols are nice and they don't increase the size on Flash
 opt-level = "z"
 
+# each feature specify the target source of distribution 
 [features]
-default = []
+default = ["serial"]
+serial = []
+http = ["wifi"]
+wifi = []
 
 experimental = ["esp-idf-svc/experimental"]
 
