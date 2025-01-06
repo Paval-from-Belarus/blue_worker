@@ -1,0 +1,26 @@
+use crate::DeviceData;
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct Scan {
+    ///duration in millis for scan
+    pub duration: u64,
+    pub devices: Vec<DeviceData>,
+}
+
+impl Scan {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bitcode::serialize(self).unwrap()
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Option<Scan> {
+        bitcode::deserialize(bytes).ok()
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("Scan is valid for json")
+    }
+
+    pub fn from_json(&self, json: &str) -> Option<Self> {
+        serde_json::from_str(json).ok()
+    }
+}
