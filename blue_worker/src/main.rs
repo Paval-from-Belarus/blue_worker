@@ -1,15 +1,30 @@
+#[cfg(feature = "http")]
 mod network;
+#[cfg(feature = "serial")]
 mod serial;
 
 use blue_types::{DeviceData, Scan};
-use esp_idf_svc::hal::prelude::Peripheral;
+use esp_idf_svc::hal::prelude::Peripherals;
 use esp_idf_svc::{
     bt::{BtClassic, BtDriver},
     nvs::EspDefaultNvsPartition,
 };
 
+#[derive(Debug, Clone)]
+#[toml_cfg::toml_config]
+#[cfg(feature = "wifi")]
+pub struct NetworkConfig {
+    #[default("private_wireless_network")]
+    pub ssid: &'static str,
+    #[default("")]
+    pub password: &'static str,
+
+    #[default("http://localhost:8080")]
+    pub base_url: &'static str,
+}
+
 pub trait Device<'a> {
-    fn send_scan(&'a self, scan: Scan) -> anyhow::Result<()>;
+    fn send_scan(&mut self, scan: Scan) -> anyhow::Result<()>;
 }
 
 #[cfg(feature = "http")]
@@ -25,15 +40,37 @@ fn main() -> anyhow::Result<()> {
     #[cfg(not(feature = "wifi"))]
     let bl_modem = peripherals.modem;
 
+    #[cfg(feature = "serial")]
+    let mut device = {
+        use esp_idf_svc::hal;
+        use serial::SerialDevice;
+
+        let tx = peripherals.pins.gpio5;
+        let rx = peripherals.pins.gpio6;
+
+        let config = hal::uart::config::Config::new()
+            .baudrate(hal::units::Hertz(115_200));
+
+        let uart = hal::uart::UartDriver::new(
+            peripherals.uart1,
+            tx,
+            rx,
+            Option::<hal::gpio::Gpio0>::None,
+            Option::<hal::gpio::Gpio1>::None,
+            &config,
+        )
+        .expect("Failed to access uart driver");
+
+        SerialDevice::new(uart)
+    };
+
     #[cfg(feature = "wifi")]
     let (wifi_modem, bl_modem) = peripherals.modem.split();
 
     #[cfg(feature = "http")]
-    let device = HttpDevice::new(wifi_modem, nvs.clone())
-        .expect("Failed to create http device");
-
-    #[cfg(feature = "serial")]
-    let device = ();
+    let device =
+        HttpDevice::new(wifi_modem, nvs.clone(), NETWORK_CONFIG.clone())
+            .expect("Failed to create http device");
 
     let mut bt_driver =
         BtDriver::<'static, BtClassic>::new(bl_modem, Some(nvs)).unwrap();
@@ -79,9 +116,4 @@ fn scan_devices(bt_driver: &mut BtDriver<BtClassic>) -> Scan {
             duration: scan_duration,
         }
     }
-}
-
-#[cfg(feature = "serial")]
-fn send_scan(_scan: Scan, _device: ()) -> anyhow::Result<()> {
-    Ok(())
 }

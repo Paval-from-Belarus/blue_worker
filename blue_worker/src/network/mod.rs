@@ -7,29 +7,18 @@ use esp_idf_svc::{
 
 use esp_idf_svc::hal::sys::esp_crt_bundle_attach;
 
-use crate::Device;
-
-#[derive(Debug)]
-#[toml_cfg::toml_config]
-#[cfg(feature = "http")]
-pub struct NetworkConfig {
-    #[default("private_wireless_network")]
-    pub ssid: &'static str,
-    #[default("")]
-    pub password: &'static str,
-
-    #[default("http://localhost:8080")]
-    pub base_url: &'static str,
-}
+use crate::{Device, NetworkConfig};
 
 pub struct HttpDevice<'a> {
     device: BlockingWifi<EspWifi<'a>>,
+    config: NetworkConfig,
 }
 
 impl HttpDevice<'_> {
     pub fn new(
         modem: WifiModem,
         nvs: EspDefaultNvsPartition,
+        config: NetworkConfig,
     ) -> anyhow::Result<Self> {
         let device = {
             use embedded_svc::wifi;
@@ -42,11 +31,11 @@ impl HttpDevice<'_> {
                 sys_loop.clone(),
             )?;
 
-            log::info!("Wi-Fi config: {:?}", NETWORK_CONFIG);
+            log::info!("Wi-Fi config: {:?}", config);
             wifi.set_configuration(&wifi::Configuration::Client(
                 wifi::ClientConfiguration {
-                    ssid: NETWORK_CONFIG.ssid.try_into().expect("Invalid ssid"),
-                    password: NETWORK_CONFIG
+                    ssid: config.ssid.try_into().expect("Invalid ssid"),
+                    password: config
                         .password
                         .try_into()
                         .expect("Invalid password"),
@@ -72,12 +61,12 @@ impl HttpDevice<'_> {
             wifi
         };
 
-        Ok(Self { device })
+        Ok(Self { device, config })
     }
 }
 
 impl<'a> Device<'a> for HttpDevice<'a> {
-    fn send_scan(&'a self, scan: blue_types::Scan) -> anyhow::Result<()> {
+    fn send_scan(&self, scan: blue_types::Scan) -> anyhow::Result<()> {
         use embedded_svc::http::client::Client;
         use esp_idf_svc::http::client::{
             Configuration as HttpConfig, EspHttpConnection,
@@ -87,7 +76,7 @@ impl<'a> Device<'a> for HttpDevice<'a> {
 
         use std::time::Duration;
 
-        let devices_url = NETWORK_CONFIG.base_url;
+        let devices_url = self.config.base_url;
 
         let http_connection = EspHttpConnection::new(&HttpConfig {
             use_global_ca_store: true,
