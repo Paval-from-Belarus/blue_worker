@@ -19,7 +19,7 @@ opt-level = "z"
 
 # each feature specify the target source of distribution 
 [features]
-default = ["serial"]
+default = ["http"]
 serial = []
 http = ["wifi"]
 wifi = []
