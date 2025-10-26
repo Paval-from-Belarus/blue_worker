@@ -40,8 +40,9 @@ async fn main(spawner: Spawner) {
     let radio_init =
         esp_radio::init().expect("Failed to initialize Wi-Fi/BLE controller");
 
-    let _ = spawner;
+    let radio_init =
+        &*blue_tracker::mk_static!(esp_radio::Controller, radio_init);
 
+    blue_tracker::wifi::spawn(&radio_init, peripherals.WIFI, &spawner).await;
     blue_tracker::ble::spawn(&radio_init, peripherals.BT).await;
-    blue_tracker::wifi::spawn(&radio_init, peripherals.WIFI).await;
 }
