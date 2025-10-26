@@ -1,26 +1,29 @@
-use core::net::Ipv4Addr;
-
-use embassy_net::IpAddress;
-use esp_hal::{
-    peripherals::WIFI,
-    time::{self, Duration},
+use embassy_net::{
+    DhcpConfig, Runner, Stack, StackResources,
+    tcp::client::{TcpClient, TcpClientState},
 };
-use esp_radio::wifi::{ClientConfig, ModeConfig, PowerSaveMode, ScanConfig};
+use embassy_time::{Duration, Timer};
+use esp_hal::peripherals::WIFI;
+use esp_radio::wifi::{
+    ClientConfig, ModeConfig, PowerSaveMode, WifiController, WifiDevice,
+    WifiEvent, WifiStaState,
+};
+use reqwless::client::{HttpClient, TlsConfig};
 use smoltcp::{iface::SocketStorage, socket::dhcpv4, wire::DhcpOption};
 
-use embedded_io::*;
+use crate::mk_static;
 
 const SSID: &str = "private_wireless_network";
 const PASSWORD: &str = "WriteOnceRunAnywhere";
 
 pub async fn spawn(
-    radio_init: &esp_radio::Controller<'_>,
+    radio_init: &'static esp_radio::Controller<'_>,
     device: WIFI<'static>,
+    spawner: &embassy_executor::Spawner,
 ) {
-    let (mut controller, mut interfaces) =
+    let (mut controller, interfaces) =
         esp_radio::wifi::new(&radio_init, device, Default::default())
             .expect("Failed to initialize Wi-Fi controller");
-    let wifi_iface = create_interface(&mut interfaces.sta);
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
     let mut socket_set =
         smoltcp::iface::SocketSet::new(&mut socket_set_entries[..]);
@@ -32,130 +35,124 @@ pub async fn spawn(
     }]);
     socket_set.add(dhcp_socket);
     let rng = esp_hal::rng::Rng::new();
-    let now = || {
-        esp_hal::time::Instant::now()
-            .duration_since_epoch()
-            .as_millis()
-    };
+    let net_seed = rng.random() as u64 | ((rng.random() as u64) << 32);
+    let tls_seed = rng.random() as u64 | ((rng.random() as u64) << 32);
 
-    let stack = blocking_network_stack::Stack::new(
-        wifi_iface,
+    let dhcp_config = DhcpConfig::default();
+    // dhcp_config.hostname = Some(String::from_str("implRust").unwrap());
+
+    let config = embassy_net::Config::dhcpv4(dhcp_config);
+
+    // Init network stack
+    let (stack, runner) = embassy_net::new(
         interfaces.sta,
-        socket_set,
-        now,
-        rng.random(),
+        config,
+        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        net_seed,
     );
 
     controller.set_power_saving(PowerSaveMode::None).unwrap();
 
-    let client_config = ModeConfig::Client(
-        ClientConfig::default()
-            .with_ssid(SSID.into())
-            .with_password(PASSWORD.into()),
-    );
+    spawner.spawn(connection(controller)).unwrap();
+    spawner.spawn(net_task(runner)).unwrap();
 
-    let res = controller.set_config(&client_config);
-    log::info!("wifi_set_configuration returned {:?}", res);
+    wait_for_connection(stack).await;
 
-    controller.start().unwrap();
-    log::info!("is wifi started: {:?}", controller.is_started());
+    access_website(stack, tls_seed).await;
+}
 
-    log::info!("Start Wifi Scan");
-    let scan_config = ScanConfig::default().with_max(10);
-    let res = controller.scan_with_config(scan_config).unwrap();
-    for ap in res {
-        log::info!("{:?}", ap);
-    }
-
-    log::info!("{:?}", controller.capabilities());
-    log::info!("wifi_connect {:?}", controller.connect());
-
-    // wait to get connected
-    log::info!("Wait to get connected");
+async fn wait_for_connection(stack: Stack<'_>) {
+    log::info!("Waiting for link to be up");
     loop {
-        match controller.is_connected() {
-            Ok(true) => break,
-            Ok(false) => {}
-            Err(err) => {
-                log::info!("{:?}", err);
-                loop {}
-            }
-        }
-    }
-    log::info!("{:?}", controller.is_connected());
-
-    // wait for getting an ip address
-    log::info!("Wait to get an ip address");
-    loop {
-        stack.work();
-
-        if stack.is_iface_up() {
-            log::info!("got ip {:?}", stack.get_ip_info());
+        if stack.is_link_up() {
             break;
         }
+        Timer::after(Duration::from_millis(500)).await;
     }
 
-    log::info!("Start busy loop on main");
-
-    let mut rx_buffer = [0u8; 1536];
-    let mut tx_buffer = [0u8; 1536];
-    let mut socket = stack.get_socket(&mut rx_buffer, &mut tx_buffer);
-
+    log::info!("Waiting to get IP address...");
     loop {
-        log::info!("Making HTTP request");
-        socket.work();
+        if let Some(config) = stack.config_v4() {
+            log::info!("Got IP: {}", config.address);
+            break;
+        }
+        Timer::after(Duration::from_millis(500)).await;
+    }
+}
 
-        socket
-            .open(IpAddress::Ipv4(Ipv4Addr::new(142, 250, 185, 115)), 80)
-            .unwrap();
+#[embassy_executor::task]
+async fn connection(mut controller: WifiController<'static>) {
+    log::info!("start connection task");
+    log::info!("Device capabilities: {:?}", controller.capabilities());
+    loop {
+        match esp_radio::wifi::sta_state() {
+            WifiStaState::Connected => {
+                // wait until we're no longer connected
+                controller.wait_for_event(WifiEvent::StaDisconnected).await;
+                Timer::after(Duration::from_millis(5000)).await
+            }
+            _ => {}
+        }
 
-        socket
-            .write(b"GET / HTTP/1.0\r\nHost: www.mobile-j.de\r\n\r\n")
-            .unwrap();
+        if !matches!(controller.is_started(), Ok(true)) {
+            let config = ClientConfig::default()
+                .with_ssid(SSID.try_into().unwrap())
+                .with_password(PASSWORD.try_into().unwrap());
 
-        socket.flush().unwrap();
+            let config = ModeConfig::Client(config);
+            controller.set_config(&config).unwrap();
+            log::info!("Starting wifi");
 
-        let deadline = time::Instant::now() + Duration::from_secs(20);
-        let mut buffer = [0u8; 512];
-        while let Ok(len) = socket.read(&mut buffer) {
-            let to_print =
-                unsafe { core::str::from_utf8_unchecked(&buffer[..len]) };
-            log::info!("{}", to_print);
+            controller.start_async().await.unwrap();
+            log::info!("Wifi started!");
+        }
+        log::info!("About to connect...");
 
-            if time::Instant::now() > deadline {
-                log::warn!("Timeout");
-                break;
+        match controller.connect_async().await {
+            Ok(_) => log::info!("Wifi connected!"),
+            Err(e) => {
+                log::info!("Failed to connect to wifi: {:?}", e);
+                Timer::after(Duration::from_millis(5000)).await
             }
         }
-
-        socket.disconnect();
-
-        let deadline = time::Instant::now() + Duration::from_secs(5);
-        while time::Instant::now() < deadline {
-            socket.work();
-        }
     }
 }
 
-// some smoltcp boilerplate
-fn timestamp() -> smoltcp::time::Instant {
-    smoltcp::time::Instant::from_micros(
-        esp_hal::time::Instant::now()
-            .duration_since_epoch()
-            .as_micros() as i64,
-    )
+#[embassy_executor::task]
+async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
+    runner.run().await
 }
 
-pub fn create_interface(
-    device: &mut esp_radio::wifi::WifiDevice,
-) -> smoltcp::iface::Interface {
-    // users could create multiple instances but since they only have one WifiDevice
-    // they probably can't do anything bad with that
-    smoltcp::iface::Interface::new(
-        smoltcp::iface::Config::new(smoltcp::wire::HardwareAddress::Ethernet(
-            smoltcp::wire::EthernetAddress::from_bytes(&device.mac_address()),
-        )),
-        device,
-        timestamp(),
-    )
+async fn access_website(stack: Stack<'static>, tls_seed: u64) {
+    use embassy_net::dns::DnsSocket;
+
+    let mut rx_buffer = [0; 4096];
+    let mut tx_buffer = [0; 4096];
+    let dns = DnsSocket::new(stack);
+    let tcp_state = TcpClientState::<1, 4096, 4096>::new();
+    let tcp = TcpClient::new(stack, &tcp_state);
+
+    let tls = TlsConfig::new(
+        tls_seed,
+        &mut rx_buffer,
+        &mut tx_buffer,
+        reqwless::client::TlsVerify::None,
+    );
+
+    let mut client = HttpClient::new_with_tls(&tcp, &dns, tls);
+    let mut buffer = [0u8; 4096];
+    let mut http_req = client
+        .request(
+            reqwless::request::Method::GET,
+            "https://jsonplaceholder.typicode.com/posts/1",
+        )
+        .await
+        .unwrap();
+    let response = http_req.send(&mut buffer).await.unwrap();
+
+    log::info!("Got response");
+    let res = response.body().read_to_end().await.unwrap();
+
+    let content = core::str::from_utf8(res).unwrap();
+    log::info!("{}", content);
 }
