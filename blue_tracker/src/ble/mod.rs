@@ -1,5 +1,4 @@
-use core::cell::RefCell;
-
+use alloc::{string::ToString, vec::Vec};
 use bt_hci::controller::ExternalController;
 use embassy_time::{Duration, Timer};
 use esp_hal::peripherals::BT;
@@ -7,15 +6,19 @@ use esp_radio::ble::controller::BleConnector;
 
 use trouble_host::prelude::*;
 
+use crate::SharedState;
+
 const CONNECTIONS_MAX: usize = 1;
 const L2CAP_CHANNELS_MAX: usize = 1;
 
-pub async fn spawn(
-    radio_init: &esp_radio::Controller<'_>,
+pub async fn start_scan(
+    radio_init: &'static esp_radio::Controller<'_>,
     device: BT<'static>,
+    state: &'static SharedState,
 ) {
     let transport =
-        BleConnector::new(&radio_init, device, Default::default()).unwrap();
+        BleConnector::new(radio_init, device, Default::default()).unwrap();
+
     let ble_controller = ExternalController::<_, 20>::new(transport);
     let mut resources: HostResources<
         DefaultPacketPool,
@@ -23,11 +26,7 @@ pub async fn spawn(
         L2CAP_CHANNELS_MAX,
     > = HostResources::new();
 
-    let address: Address =
-        Address::random([0xff, 0x8f, 0x1b, 0x05, 0xe4, 0xff]);
-
-    let stack = trouble_host::new(ble_controller, &mut resources)
-        .set_random_address(address);
+    let stack = trouble_host::new(ble_controller, &mut resources);
 
     let Host {
         central,
@@ -35,12 +34,12 @@ pub async fn spawn(
         ..
     } = stack.build();
 
-    let printer = Printer {
-        seen: RefCell::new(heapless::Deque::new()),
-    };
     let mut scanner = Scanner::new(central);
+
+    let worker = ScanWorker { state };
+
     let _ =
-        embassy_futures::join::join(runner.run_with_handler(&printer), async {
+        embassy_futures::join::join(runner.run_with_handler(&worker), async {
             let config = ScanConfig {
                 active: true,
                 phys: PhySet::M1,
@@ -49,7 +48,7 @@ pub async fn spawn(
                 ..Default::default()
             };
 
-            let mut _session = scanner.scan(&config).await.unwrap();
+            let _session = scanner.scan(&config).await.unwrap();
             // Scan forever
             loop {
                 Timer::after(Duration::from_secs(1)).await;
@@ -58,21 +57,31 @@ pub async fn spawn(
         .await;
 }
 
-struct Printer {
-    seen: RefCell<heapless::Deque<BdAddr, 128>>,
+struct ScanWorker {
+    state: &'static SharedState,
 }
 
-impl EventHandler for Printer {
-    fn on_adv_reports(&self, mut it: LeAdvReportsIter<'_>) {
-        let mut seen = self.seen.borrow_mut();
-        while let Some(Ok(report)) = it.next() {
-            if seen.iter().find(|b| b.raw() == report.addr.raw()).is_none() {
-                log::info!("discovered: {:?}", report.addr);
-                if seen.is_full() {
-                    seen.pop_front();
+impl EventHandler for ScanWorker {
+    fn on_adv_reports(&self, it: LeAdvReportsIter<'_>) {
+        let devices = it
+            .filter_map(|report| report.ok())
+            .map(|report| {
+                let name =
+                    str::from_utf8(report.data).ok().map(|s| s.to_string());
+
+                blue_types::DeviceData {
+                    rssi: report.rssi,
+                    address: report.addr.into_inner().into(),
+                    name,
                 }
-                seen.push_back(report.addr).unwrap();
-            }
-        }
+            })
+            .collect::<Vec<_>>();
+
+        let scan = blue_types::Scan {
+            duration: embassy_time::Instant::now().as_millis() as u64,
+            devices,
+        };
+
+        self.state.scan.signal(scan);
     }
 }

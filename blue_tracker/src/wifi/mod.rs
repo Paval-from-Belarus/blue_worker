@@ -20,6 +20,7 @@ pub async fn spawn(
     radio_init: &'static esp_radio::Controller<'_>,
     device: WIFI<'static>,
     spawner: &embassy_executor::Spawner,
+    state: &'static crate::SharedState,
 ) {
     let (mut controller, interfaces) =
         esp_radio::wifi::new(&radio_init, device, Default::default())
@@ -59,6 +60,8 @@ pub async fn spawn(
     wait_for_connection(stack).await;
 
     access_website(stack, tls_seed).await;
+
+    spawner.spawn(scan_task(state)).unwrap();
 }
 
 async fn wait_for_connection(stack: Stack<'_>) {
@@ -121,6 +124,15 @@ async fn connection(mut controller: WifiController<'static>) {
 #[embassy_executor::task]
 async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
     runner.run().await
+}
+
+#[embassy_executor::task]
+async fn scan_task(state: &'static crate::SharedState) {
+    loop {
+        let scan = state.scan.wait().await;
+
+        log::info!("Scan complete:\n {:?}", scan);
+    }
 }
 
 async fn access_website(stack: Stack<'static>, tls_seed: u64) {

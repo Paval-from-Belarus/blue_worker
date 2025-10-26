@@ -43,6 +43,10 @@ async fn main(spawner: Spawner) {
     let radio_init =
         &*blue_tracker::mk_static!(esp_radio::Controller, radio_init);
 
-    blue_tracker::wifi::spawn(&radio_init, peripherals.WIFI, &spawner).await;
-    blue_tracker::ble::spawn(&radio_init, peripherals.BT).await;
+    let state = blue_tracker::SharedState::new();
+    let state = &*blue_tracker::mk_static!(blue_tracker::SharedState, state);
+
+    blue_tracker::wifi::spawn(&radio_init, peripherals.WIFI, &spawner, state)
+        .await;
+    blue_tracker::ble::start_scan(&radio_init, peripherals.BT, state).await;
 }

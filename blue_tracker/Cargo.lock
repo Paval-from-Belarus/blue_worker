@@ -95,6 +95,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
+name = "bitcode"
+version = "0.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "648bd963d2e5d465377acecfb4b827f9f553b6bc97a8f61715779e9ed9e52b74"
+dependencies = [
+ "bytemuck",
+ "serde",
+]
+
+[[package]]
 name = "bitfield"
 version = "0.19.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -139,11 +149,13 @@ dependencies = [
 name = "blue_tracker"
 version = "0.1.0"
 dependencies = [
+ "blue_types",
  "bt-hci",
  "critical-section",
  "embassy-executor",
  "embassy-futures",
  "embassy-net",
+ "embassy-sync 0.7.2",
  "embassy-time",
  "embedded-io 0.7.1",
  "embedded-io-async 0.7.0",
@@ -160,6 +172,15 @@ dependencies = [
  "smoltcp",
  "static_cell",
  "trouble-host",
+]
+
+[[package]]
+name = "blue_types"
+version = "0.1.0"
+dependencies = [
+ "bitcode",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -538,6 +559,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "heapless 0.8.0",
+ "log",
 ]
 
 [[package]]
@@ -1799,6 +1821,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.108",
+]
+
+[[package]]
+name = "serde_json"
+version = "1.0.145"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "402a6f66d8c709116cf22f558eab210f5a50187f702eb4d7e5ef38d9a7f1c79c"
+dependencies = [
+ "itoa",
+ "memchr",
+ "ryu",
+ "serde",
+ "serde_core",
 ]
 
 [[package]]

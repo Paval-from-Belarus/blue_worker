@@ -1,3 +1,5 @@
+#![no_std]
+
 mod address;
 mod device_data;
 mod scan;
@@ -5,3 +7,5 @@ mod scan;
 pub use address::MacAddress;
 pub use device_data::DeviceData;
 pub use scan::Scan;
+
+extern crate alloc;

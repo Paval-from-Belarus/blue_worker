@@ -4,11 +4,13 @@ use crate::DeviceData;
 pub struct Scan {
     ///duration in millis for scan
     pub duration: u64,
-    pub devices: Vec<DeviceData>,
+    #[cfg(feature = "alloc")]
+    pub devices: alloc::vec::Vec<DeviceData>,
 }
 
+#[cfg(feature = "alloc")]
 impl Scan {
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> alloc::vec::Vec<u8> {
         bitcode::serialize(self).unwrap()
     }
 
@@ -16,7 +18,7 @@ impl Scan {
         bitcode::deserialize(bytes).ok()
     }
 
-    pub fn to_json(&self) -> String {
+    pub fn to_json(&self) -> alloc::string::String {
         serde_json::to_string(self).expect("Scan is valid for json")
     }
 

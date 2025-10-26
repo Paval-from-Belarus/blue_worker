@@ -4,6 +4,7 @@ use crate::MacAddress;
 pub struct DeviceData {
     ///MAC-address for device
     pub address: MacAddress,
-    pub name: Option<String>,
+    #[cfg(feature = "alloc")]
+    pub name: Option<alloc::string::String>,
     pub rssi: i8,
 }

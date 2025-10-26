@@ -1,5 +1,7 @@
 #![no_std]
 
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
+
 pub mod ble;
 pub mod wifi;
 
@@ -12,4 +14,18 @@ macro_rules! mk_static {
         let x = STATIC_CELL.uninit().write(($val));
         x
     }};
+}
+
+extern crate alloc;
+
+pub struct SharedState {
+    pub scan: Signal<NoopRawMutex, blue_types::Scan>,
+}
+
+impl SharedState {
+    pub fn new() -> Self {
+        Self {
+            scan: Signal::new(),
+        }
+    }
 }

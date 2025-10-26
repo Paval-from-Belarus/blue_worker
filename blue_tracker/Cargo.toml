@@ -77,6 +77,8 @@ static_cell = "2.1.1"
 heapless = "0.9.1"
 embassy-futures = "0.1.2"
 reqwless = "0.13.0"
+embassy-sync = { version = "0.7.2", features = ["log"] }
+blue_types = { path = "../blue_types" }
 
 
 [profile.dev]
