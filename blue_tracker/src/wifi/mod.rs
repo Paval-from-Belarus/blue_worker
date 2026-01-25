@@ -13,10 +13,12 @@ use smoltcp::{iface::SocketStorage, socket::dhcpv4, wire::DhcpOption};
 
 use crate::mk_static;
 
-const SSID: &str = "private_wireless_network";
-const PASSWORD: &str = "WriteOnceRunAnywhere";
+// const SSID: &str = "private_wireless_network";
+// const PASSWORD: &str = "WriteOnceRunAnywhere";
+const SSID: &str = "Cudy-10B0";
+const PASSWORD: &str = "43149155";
 
-pub async fn spawn(
+pub async fn start_task(
     radio_init: &'static esp_radio::Controller<'_>,
     device: WIFI<'static>,
     spawner: &embassy_executor::Spawner,
@@ -54,7 +56,7 @@ pub async fn spawn(
 
     controller.set_power_saving(PowerSaveMode::None).unwrap();
 
-    spawner.spawn(connection(controller)).unwrap();
+    spawner.spawn(connection(controller, state)).unwrap();
     spawner.spawn(net_task(runner)).unwrap();
 
     wait_for_connection(stack).await;
@@ -84,10 +86,16 @@ async fn wait_for_connection(stack: Stack<'_>) {
 }
 
 #[embassy_executor::task]
-async fn connection(mut controller: WifiController<'static>) {
+async fn connection(
+    mut controller: WifiController<'static>,
+    state: &'static crate::SharedState,
+) {
     log::info!("start connection task");
     log::info!("Device capabilities: {:?}", controller.capabilities());
+
     loop {
+        state.set_connection_state(esp_radio::wifi::sta_state());
+
         match esp_radio::wifi::sta_state() {
             WifiStaState::Connected => {
                 // wait until we're no longer connected
@@ -128,8 +136,15 @@ async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
 
 #[embassy_executor::task]
 async fn scan_task(state: &'static crate::SharedState) {
+    let mut prev_scan = embassy_time::Instant::now();
+
     loop {
-        let scan = state.scan.wait().await;
+        let mut scan = state.scan.wait().await;
+        let now = embassy_time::Instant::from_millis(scan.duration);
+        let elapsed = now.duration_since(prev_scan).as_millis();
+        prev_scan = now;
+
+        scan.duration = elapsed;
 
         log::info!("Scan complete:\n {:?}", scan);
     }
