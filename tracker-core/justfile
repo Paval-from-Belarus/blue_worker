@@ -1,0 +1,6 @@
+test-all:
+    cargo test --all --all-features --all-targets
+
+lint:
+    cargo check --all-targets
+    cargo clippy --all --all-features --all-targets -- -D warnings
