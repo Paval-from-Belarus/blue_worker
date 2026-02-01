@@ -1,6 +1,6 @@
 use nalgebra::{SMatrix, SMatrixView, Vector2, Vector4};
 
-use ukf_rs::filter::{KallmanFilter, PredictionConfig, UpdateConfig};
+use ukf_rs::filter::{Filter, PredictionConfig, UpdateConfig};
 use ukf_rs::ops::{linear_mean, linear_residual};
 use ukf_rs::{estimate_merwe_weights, noise, sigma_order, SigmaMetadata};
 
@@ -73,7 +73,7 @@ fn test_radar() {
         beta: 2.0,
         kappa: -1.0,
     });
-    let mut filter = KallmanFilter::<4, 2, S>::with_weights(weights);
+    let mut filter = Filter::<4, 2, S>::with_weights(weights);
     filter.state.copy_from_slice(&[0., 90., 1100., 0.]);
 
     filter

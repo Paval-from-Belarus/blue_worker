@@ -103,7 +103,7 @@ where
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KallmanFilter<const N: usize, const K: usize, const S: usize> {
+pub struct Filter<const N: usize, const K: usize, const S: usize> {
     /// X
     pub state: SMatrix<f32, 1, N>,
     prior_state: Option<SMatrix<f32, 1, N>>,
@@ -135,14 +135,14 @@ pub struct KallmanFilter<const N: usize, const K: usize, const S: usize> {
 }
 
 impl<const N: usize, const K: usize, const S: usize> Default
-    for KallmanFilter<N, K, S>
+    for Filter<N, K, S>
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<const N: usize, const K: usize, const S: usize> KallmanFilter<N, K, S> {
+impl<const N: usize, const K: usize, const S: usize> Filter<N, K, S> {
     pub fn new() -> Self {
         assert_eq!(sigma_order(N), S);
 

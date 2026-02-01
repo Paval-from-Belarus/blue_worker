@@ -1,7 +1,7 @@
 use nalgebra::{Const, Dyn, OMatrix, SMatrix, SMatrixView};
 use rand::Rng;
 
-use ukf_rs::filter::{KallmanFilter, PredictionConfig, UpdateConfig};
+use ukf_rs::filter::{Filter, PredictionConfig, UpdateConfig};
 use ukf_rs::ops::{linear_mean, linear_residual};
 use ukf_rs::{estimate_merwe_weights, sigma_order, SigmaMetadata};
 
@@ -15,7 +15,7 @@ pub fn test_linear_1d() {
         beta: 2.0,
         kappa: -1.0,
     });
-    let mut filter = KallmanFilter::<2, 1, S>::with_weights(weights);
+    let mut filter = Filter::<2, 1, S>::with_weights(weights);
 
     filter.state.copy_from_slice(&[1.0, 2.0]);
     filter.covariance.copy_from_slice(&[1.0, 1.1, 1.1, 3.0]);
