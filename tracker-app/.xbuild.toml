@@ -1,0 +1,5 @@
+[android]
+package_name = "com.example.myapp"
+app_name = "My Indoor Loc App"
+target_sdk_version = 34
+min_sdk_version = 24

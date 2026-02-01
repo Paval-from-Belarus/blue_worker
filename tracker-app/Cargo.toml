@@ -1,0 +1,41 @@
+[package]
+name = "my_indoor_loc_app"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ndk-sys = "0.6" # Low-level sensor access
+btleplug = "0.11" # Bluetooth LE
+jni = "0.19" # Wi-Fi and Bluetooth JNI
+log = "0.4" # Logging
+android_logger = "0.15" # Android logging
+ndk = { version = "0.9.0", features = [] }
+tokio = { version = "1.48", features = [
+	"rt",
+	"macros",
+	"rt-multi-thread",
+] } # Async for BLE
+winit = "0.30" # Window and input handling
+wgpu = "27.0" # Rendering backend
+egui_demo_lib = "0.33.0"
+
+eframe = { version = "0.33", default-features = false, features = [
+	"android-native-activity",
+	"wgpu",
+	"default_fonts",
+] }
+tokio-stream = "0.1.17"
+
+[target.'cfg(target_os = "android")'.dependencies.egui-winit]
+version = "0.32"
+default-features = false
+features = ["clipboard", "links"]
+
+[profile.release]
+strip = true      # Automatically strip symbols from the binary.
+opt-level = "z"   # Optimize for size.
+lto = true
+codegen-units = 1
