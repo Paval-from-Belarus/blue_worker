@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 use std::sync::Arc;
 
 use actix_files::Files;
@@ -16,7 +14,8 @@ async fn main() -> std::io::Result<()> {
         .filter_level(log::LevelFilter::Info)
         .init();
 
-    let shared_state = DeviceSharedState::load_from_config("shared_state.json").await;
+    let shared_state =
+        DeviceSharedState::load_from_config("shared_state.json").await;
 
     let shared_lock = Arc::new(RwLock::new(shared_state));
 
