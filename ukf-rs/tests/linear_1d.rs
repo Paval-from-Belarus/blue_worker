@@ -1,9 +1,9 @@
 use nalgebra::{Const, Dyn, OMatrix, SMatrix, SMatrixView};
 use rand::Rng;
-use ukf_rs::{
-    estimate_merwe_weights, linear_mean, linear_residual, sigma_order,
-    KallmanFilter, PredictionConfig, SigmaMetadata, UpdateConfig,
-};
+
+use ukf_rs::filter::{KallmanFilter, PredictionConfig, UpdateConfig};
+use ukf_rs::ops::{linear_mean, linear_residual};
+use ukf_rs::{estimate_merwe_weights, sigma_order, SigmaMetadata};
 
 #[test]
 pub fn test_linear_1d() {
@@ -32,7 +32,7 @@ pub fn test_linear_1d() {
         let z_value = if is_first {
             2.0
         } else {
-            rand::thread_rng().gen::<f32>()
+            rand::rng().random::<f32>()
         };
 
         let z = SMatrix::<f32, 1, 1>::from_fn(|_, _| z_value);

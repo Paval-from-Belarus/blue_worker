@@ -1,8 +1,8 @@
 use nalgebra::{SMatrix, SMatrixView, Vector2, Vector4};
-use ukf_rs::{
-    estimate_merwe_weights, linear_mean, linear_residual, noise, sigma_order,
-    KallmanFilter, PredictionConfig, SigmaMetadata, UpdateConfig,
-};
+
+use ukf_rs::filter::{KallmanFilter, PredictionConfig, UpdateConfig};
+use ukf_rs::ops::{linear_mean, linear_residual};
+use ukf_rs::{estimate_merwe_weights, noise, sigma_order, SigmaMetadata};
 
 use plotters::{
     chart::ChartBuilder,
@@ -35,8 +35,8 @@ fn test_radar() {
 
         fn noisy_reading(&self, ac_pos: Vector2<f32>) -> [f32; 2] {
             let [mut range, mut angle] = self.reading_of(ac_pos);
-            range += rand::thread_rng().gen::<f32>() * self.range_std;
-            angle += rand::thread_rng().gen::<f32>() * self.elevation_angle_std;
+            range += rand::rng().random::<f32>() * self.range_std;
+            angle += rand::rng().random::<f32>() * self.elevation_angle_std;
             [range, angle]
         }
     }
@@ -51,9 +51,7 @@ fn test_radar() {
     impl Airplane {
         fn update(&mut self, dt: f32) {
             let mut dx = self.vel * dt;
-            dx.add_scalar_mut(
-                rand::thread_rng().gen::<f32>() * self.vel_std * dt,
-            );
+            dx.add_scalar_mut(rand::rng().random::<f32>() * self.vel_std * dt);
             self.pos += dx;
         }
     }
