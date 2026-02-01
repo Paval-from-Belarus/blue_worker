@@ -1,8 +1,8 @@
 mod error;
+pub mod filter;
 pub mod noise;
+pub mod ops;
 mod sigma_points;
-mod state;
-mod unscented;
 
 use nalgebra::{Const, Dyn, OMatrix, SMatrix, SMatrixView};
 
@@ -10,11 +10,6 @@ pub use error::*;
 pub use sigma_points::{
     estimate_merwe_sigmas, estimate_merwe_weights, sigma_order, SigmaMetadata,
     SigmaWeights,
-};
-pub use state::*;
-
-pub use unscented::{
-    linear_mean, linear_residual, KallmanFilter, PredictionConfig, UpdateConfig,
 };
 
 pub trait FnState<const N: usize>:

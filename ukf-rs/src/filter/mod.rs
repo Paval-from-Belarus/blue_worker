@@ -1,3 +1,9 @@
+mod config;
+mod snapshot;
+
+pub use config::{PredictionConfig, UpdateConfig};
+pub use snapshot::StateSnapshot;
+
 use std::time::SystemTime;
 
 use nalgebra::{
@@ -6,38 +12,10 @@ use nalgebra::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{sigma_order, sigma_points};
-
 use super::{
-    estimate_merwe_sigmas, FilterState, FnDistance, FnMean, FnMeasurement,
-    FnState, MathError, SigmaWeights,
+    estimate_merwe_sigmas, sigma_order, sigma_points, FnDistance, FnMean,
+    FnMeasurement, FnState, MathError, SigmaWeights,
 };
-
-pub fn linear_residual<const N: usize>(
-    x: SMatrixView<f32, 1, N>,
-    y: SMatrixView<f32, 1, N>,
-) -> SMatrix<f32, 1, N> {
-    x - y
-}
-
-pub fn linear_mean<const N: usize, const S: usize>(
-    weights: SMatrixView<f32, 1, S>,
-    sigmas: SMatrixView<f32, S, N>,
-) -> SMatrix<f32, 1, N> {
-    weights * sigmas
-}
-
-pub fn identity_state<const N: usize>(
-    view: SMatrixView<f32, 1, N>,
-) -> SMatrix<f32, 1, N> {
-    view.clone_owned()
-}
-
-pub fn zeros_measurement<const N: usize, const K: usize>(
-    _state: SMatrixView<f32, 1, N>,
-) -> SMatrix<f32, 1, K> {
-    SMatrix::zeros()
-}
 
 pub fn identity_transform<const N: usize>() -> OMatrix<f32, Dyn, Const<N>> {
     OMatrix::<f32, Dyn, Const<N>>::identity(N)
@@ -156,20 +134,6 @@ pub struct KallmanFilter<const N: usize, const K: usize, const S: usize> {
     pub weights: SigmaWeights<S>,
 }
 
-pub struct PredictionConfig<F, M, R> {
-    pub next_state: F,
-    pub mean_transform: M,
-    pub state_sub: R,
-}
-
-pub struct UpdateConfig<M, MT, MR, SR> {
-    pub state_to_meas: M,
-    /// transformation for sigma points
-    pub mean_transform: MT,
-    pub meas_sub: MR,
-    pub state_sub: SR,
-}
-
 impl<const N: usize, const K: usize, const S: usize> Default
     for KallmanFilter<N, K, S>
 {
@@ -218,8 +182,8 @@ impl<const N: usize, const K: usize, const S: usize> KallmanFilter<N, K, S> {
     pub fn state_snapshot(
         &self,
         timestamp: SystemTime,
-    ) -> FilterState<N, K, S> {
-        FilterState {
+    ) -> StateSnapshot<N, K, S> {
+        StateSnapshot {
             state: self.state.clone_owned(),
             covariance: self.covariance.clone_owned(),
             meas_noise: self.meas_noise.clone_owned(),
@@ -245,12 +209,12 @@ impl<const N: usize, const K: usize, const S: usize> KallmanFilter<N, K, S> {
 
     pub fn reset_with_state(
         &mut self,
-        FilterState {
+        StateSnapshot {
             state,
             covariance,
             meas_noise,
             ..
-        }: FilterState<N, K, S>,
+        }: StateSnapshot<N, K, S>,
     ) {
         self.state = state;
         self.covariance = covariance;
